@@ -165,9 +165,18 @@ playButton.addEventListener("click", function () {
     say("Paused.");
     return;
   }
-  tone = playClusterTone(instrumentOf(cluster));
+  tone = playRecording(audioUrl(currentJobId(), cluster.audio), {
+    onEnded: function () {
+      stopPlayback();
+      say("Cluster " + cluster.cluster_id + " finished.");
+    },
+    onError: function () {
+      stopPlayback();
+      say("That cluster recording could not play.");
+    }
+  });
   setPlaying(true);
-  say("Playing cluster " + cluster.cluster_id + " on " + instrumentName(instrumentOf(cluster)).toLowerCase() + ". Other clusters are muted.");
+  say("Playing the recording for cluster " + cluster.cluster_id + ". Other clusters are muted.");
 });
 
 document.getElementById("stop").addEventListener("click", function () {
@@ -185,9 +194,8 @@ instrumentSelect.addEventListener("change", function () {
   const cluster = selected();
   if (!cluster) return;
   chosenInstrument[cluster.cluster_id] = instrumentSelect.value;
-  if (tone) tone.setInstrument(instrumentSelect.value);
   fillPick(cluster);
-  say("Cluster " + cluster.cluster_id + " will now play on " + instrumentName(instrumentSelect.value).toLowerCase() + ".");
+  say("The saved recording still uses " + instrumentName(cluster.instrument || "piano").toLowerCase() + ". Run the analysis again to record this cluster on " + instrumentName(instrumentSelect.value).toLowerCase() + ".");
 });
 
 keysOn.addEventListener("change", function () {

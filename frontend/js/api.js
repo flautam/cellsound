@@ -80,6 +80,11 @@ function downloadExport(jobId, include) {
   });
 }
 
+function audioUrl(jobId, name) {
+  const file = String(name || "").replace(/\.wav$/, "");
+  return "/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav";
+}
+
 function analyzeJob(jobId, body) {
   if (USE_MOCK) {
     mockRun.mode = "analyze";

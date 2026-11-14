@@ -77,98 +77,67 @@ function scheduleTone(when, frequency, panValue, duration) {
   };
 }
 
-function playCue(kind, spatial) {
+function playRecording(url, options) {
+  const settings = options || {};
   stopAllSound(true);
-  const start = audioContext().currentTime + 0.05;
-  const side = spatial ? -0.7 : 0;
-  if (kind === "pitch") {
-    scheduleTone(start, 330, side, 0.45);
-    scheduleTone(start + 0.5, 660, spatial ? 0.7 : 0, 0.45);
-    return;
-  }
-  if (kind === "volume") {
-    scheduleTone(start, 440, side, 0.4);
-    scheduleTone(start + 0.5, 440, spatial ? 0.4 : 0, 0.7);
-    return;
-  }
-  if (kind === "beat") {
-    scheduleTone(start, 220, side, 0.12);
-    scheduleTone(start + 0.45, 220, side, 0.12);
-    scheduleTone(start + 0.75, 220, side, 0.12);
-    scheduleTone(start + 0.95, 220, side, 0.12);
-    return;
-  }
-  scheduleTone(start, 392, side, 0.35);
-  scheduleTone(start + 0.4, 523, spatial ? 0.5 : 0, 0.45);
-}
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  const ratio = settings.ratio || 0;
 
-function startOverviewTone(spatial) {
-  stopAllSound(true);
-  const ctx = audioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const pan = ctx.createStereoPanner();
-  osc.type = "sine";
-  osc.frequency.value = 392;
-  pan.pan.value = spatial ? -0.4 : 0;
-  gain.gain.value = Math.max(0.0001, 0.08 * appVolume);
-  osc.connect(gain);
-  gain.connect(pan);
-  pan.connect(speaker());
-  osc.start();
-  function stop() {
-    try { osc.stop(); } catch (error) { /* already stopped */ }
+  function applyVolume() {
+    audio.volume = Math.max(0, Math.min(1, appVolume));
   }
+
+  audio.addEventListener("loadedmetadata", function () {
+    applyVolume();
+    audio.playbackRate = settings.rate || 1;
+    if (ratio > 0 && audio.duration) {
+      audio.currentTime = Math.min(audio.duration * ratio, Math.max(0, audio.duration - 0.05));
+    }
+  });
+  audio.addEventListener("error", function () {
+    if (settings.onError) settings.onError();
+  });
+  audio.addEventListener("ended", function () {
+    activeSounds.delete(stop);
+    if (settings.onEnded) settings.onEnded();
+  });
+
+  function stop() {
+    audio.pause();
+  }
+
   activeSounds.add(stop);
-  osc.onended = function () { activeSounds.delete(stop); };
+  const started = audio.play();
+  if (started && started.catch) {
+    started.catch(function () {
+      if (settings.onError) settings.onError();
+    });
+  }
   return {
-    glide: function (frame, total) {
-      const mix = total ? frame / total : 0;
-      osc.frequency.setTargetAtTime(320 + mix * 280, ctx.currentTime, 0.08);
-      if (spatial) pan.pan.setTargetAtTime(Math.sin(mix * 6) * 0.7, ctx.currentTime, 0.08);
-      gain.gain.setTargetAtTime(Math.max(0.0001, 0.08 * appVolume), ctx.currentTime, 0.05);
+    setVolume: applyVolume,
+    setRate: function (rate) {
+      audio.playbackRate = rate || 1;
+    },
+    seekRatio: function (next) {
+      if (!audio.duration) return;
+      audio.currentTime = Math.max(0, Math.min(0.999, next)) * audio.duration;
+    },
+    ready: function () {
+      return Boolean(audio.duration);
+    },
+    currentRatio: function () {
+      if (!audio.duration) return 0;
+      return audio.currentTime / audio.duration;
     }
   };
 }
 
-function clusterVoice(name) {
-  const key = String(name || "piano").toLowerCase();
-  const voices = {
-    piano: { type: "sine", frequency: 392, gain: 0.08 },
-    marimba: { type: "triangle", frequency: 494, gain: 0.07 },
-    cello: { type: "triangle", frequency: 196, gain: 0.08 },
-    flute: { type: "sine", frequency: 587, gain: 0.06 },
-    bell: { type: "sine", frequency: 784, gain: 0.05 },
-    "soft synth": { type: "triangle", frequency: 330, gain: 0.06 }
-  };
-  return voices[key] || voices.piano;
-}
-
-function playClusterTone(name) {
-  stopAllSound(true);
-  const ctx = audioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const voice = clusterVoice(name);
-  osc.type = voice.type;
-  osc.frequency.value = voice.frequency;
-  gain.gain.value = Math.max(0.0001, voice.gain * appVolume);
-  osc.connect(gain);
-  gain.connect(speaker());
-  osc.start();
-  function stop() {
-    try { osc.stop(); } catch (error) { /* already stopped */ }
-  }
-  activeSounds.add(stop);
-  osc.onended = function () { activeSounds.delete(stop); };
-  return {
-    setInstrument: function (next) {
-      const chosen = clusterVoice(next);
-      osc.type = chosen.type;
-      osc.frequency.setTargetAtTime(chosen.frequency, ctx.currentTime, 0.08);
-      gain.gain.setTargetAtTime(Math.max(0.0001, chosen.gain * appVolume), ctx.currentTime, 0.08);
-    }
-  };
+function playCue(kind) {
+  const job = typeof currentJobId === "function" ? currentJobId() : "";
+  if (!job) return;
+  stopAllSound();
+  playRecording(audioUrl(job, "example_" + kind));
 }
 
 function playSoundCheck() {

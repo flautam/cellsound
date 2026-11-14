@@ -21,12 +21,12 @@ from uuid import uuid4
 import imageio.v3 as iio
 import numpy as np
 import pandas as pd
-import soundfile as sf
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.results import build_analysis
+from backend.sonify import write_sounds
 from backend.track import choose_device, limit_for_cpu, link_tracks, segment_nuclei, select_frames
 from backend.video import load_video
 
@@ -64,15 +64,6 @@ def _missing(job_id: str):
     if not (_job_dir(job_id) / "meta.json").exists():
         return JSONResponse(status_code=404, content={"error": "missing_job", "message": "That analysis was not found."})
     return None
-
-
-def _tone(path: Path, frequency: float) -> None:
-    rate = 22050
-    seconds = 1.5
-    times = np.linspace(0, seconds, int(rate * seconds), endpoint=False)
-    wave = (0.2 * np.sin(2 * np.pi * float(frequency) * times)).astype(np.float32)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(path, wave, rate)
 
 
 def _track(job_id: str, video_path: Path) -> None:
@@ -225,13 +216,16 @@ def analyze(job_id: str, body: dict):
     (folder / "settings.json").write_text(json.dumps(body))
     if not motion.empty:
         motion.to_csv(folder / "motion.csv", index=False)
-    sounds = folder / "sounds"
-    sounds.mkdir(exist_ok=True)
-    population = summary["population"]
-    base = 392 + max(-120, min(180, -population["mean_radial_v"] * 80))
-    _tone(sounds / "overview.wav", base)
-    for cluster in summary["clusters"]:
-        _tone(sounds / cluster["audio"], 320 + max(0, min(400, 400 - cluster["mean_radial_v"] * 40)))
+    poa = body.get("poa") or {}
+    write_sounds(
+        folder / "sounds",
+        motion,
+        summary,
+        float(poa.get("x", 0)),
+        float(poa.get("y", 0)),
+        int(meta.get("width") or 1),
+        int(meta.get("height") or 1),
+    )
     _write_meta(job_id, status="done", stage="done", message="Analysis finished")
     return {"status": "done"}
 
@@ -257,7 +251,7 @@ def audio(job_id: str, name: str):
     path = _job_dir(job_id) / "sounds" / f"{name}.wav"
     if not path.exists():
         return JSONResponse(status_code=404, content={"error": "missing_audio", "message": "That sound is not ready yet."})
-    return FileResponse(path, media_type="audio/wav")
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/jobs/{job_id}/export.zip")

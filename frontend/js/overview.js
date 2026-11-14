@@ -93,6 +93,7 @@ function halt(message) {
 }
 
 function finish() {
+  if (!playing) return;
   frame = totalFrames;
   showPosition();
   halt("Overview finished.");
@@ -102,23 +103,28 @@ function finish() {
   }
 }
 
-function tick() {
-  frame = Math.min(totalFrames, frame + 4);
+function followRecording() {
+  if (!tone || !tone.ready()) return;
+  frame = Math.round(Math.min(1, tone.currentRatio()) * totalFrames);
   showPosition();
-  if (tone) tone.glide(frame, totalFrames);
   paintCues();
-  if (frame >= totalFrames) finish();
 }
 
 function begin() {
   if (frame >= totalFrames) frame = 0;
   showPosition();
-  tone = startOverviewTone(true);
+  tone = playRecording(audioUrl(jobId, "overview"), {
+    rate: Number(rate.value || 1),
+    ratio: totalFrames ? frame / totalFrames : 0,
+    onEnded: finish,
+    onError: function () {
+      halt("The overview recording could not play.");
+    }
+  });
   setPlaying(true);
-  say("Playing overview from " + positionWords() + ".");
-  const wait = Math.round(300 / Number(rate.value || 1));
+  say("Playing the overview recording from " + positionWords() + ".");
   clearInterval(timer);
-  timer = setInterval(tick, wait);
+  timer = setInterval(followRecording, 200);
 }
 
 function ns(name) {
@@ -247,7 +253,7 @@ function buildCards() {
     hear.className = "btn btn-quiet";
     hear.textContent = card.example;
     hear.addEventListener("click", function () {
-      playCue(card.cue, true);
+      playCue(card.cue);
       say(card.status);
       paintCues(card.cue);
       window.setTimeout(function () { paintCues(); }, 1400);
@@ -288,20 +294,19 @@ position.addEventListener("input", function () {
   frame = Number(position.value);
   showPosition();
   paintCues();
+  if (tone && totalFrames) tone.seekRatio(frame / totalFrames);
 });
 
 volume.addEventListener("input", function () {
   setAppVolume(volume.value);
   volume.setAttribute("aria-valuetext", "Volume " + volume.value + " percent");
   volumeHint.textContent = "Volume " + volume.value + " percent. Separate from your screen reader.";
-  if (tone) tone.glide(frame, totalFrames);
+  if (tone) tone.setVolume();
   paintCues();
 });
 
 rate.addEventListener("change", function () {
-  if (!playing) return;
-  clearInterval(timer);
-  timer = setInterval(tick, Math.round(300 / Number(rate.value || 1)));
+  if (tone) tone.setRate(Number(rate.value || 1));
 });
 
 document.getElementById("trace-show").addEventListener("change", drawTraces);
