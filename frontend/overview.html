@@ -70,56 +70,57 @@
 </div>
 <div class="page stack">
   <section class="card" aria-labelledby="listen-h">
-    <h2 id="listen-h">Listen</h2>
-    <div class="flow">
-      <button type="button" class="btn btn-primary" id="play"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg><span id="play-label">Play overview</span></button>
-      <button type="button" class="btn btn-line" id="replay">Replay from start</button>
-      <button type="button" class="btn btn-stop" id="stop">Stop all sound (Esc)</button>
-    </div>
-    <fieldset class="hear-set" id="hear-set">
-      <legend>Clusters to hear</legend>
-      <div class="hear-boxes" id="hear-boxes"></div>
-    </fieldset>
-    <p class="hint" id="hear-note" role="status" aria-live="polite" aria-atomic="true">Cluster choices will appear when the summary loads.</p>
-    <div class="cues" id="wave" aria-hidden="true">
-      <div class="cue"><span>Tone</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
-      <div class="cue"><span>Pulses</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
-    </div>
-    <p class="hint">Each cluster keeps its own tone. Faster pulses mean that cluster is closer to the Point of Audio. Farther cells tap more slowly.</p>
-    <div class="split">
-      <div class="field" style="flex:2 1 18em">
-        <label for="pos">Position in video</label>
-        <input id="pos" type="range" min="0" max="200" value="0" aria-valuetext="0 hours 0 minutes of 16 hours 40 minutes">
-        <p class="hint" id="pos-visible" aria-hidden="true">0 hours 0 minutes of 16 hours 40 minutes</p>
+    <h2 id="listen-h">Listen with cluster video</h2>
+    <p class="hint">Sound and the cluster tracking video stay on the same timeline. Scrub once, both move together.</p>
+    <div class="split" style="align-items:flex-start">
+      <div id="cluster-video-wrap" hidden style="flex:1 1 16em;min-width:12em;max-width:28rem">
+        <video id="cluster-video" playsinline muted preload="auto" aria-label="Cluster tracking video, synced to the overview sound" style="width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)"></video>
+        <p class="hint" style="margin-top:0.5em">Fixed-radius chunk circles on the tracked frames. Muted — listen with the overview sound.</p>
       </div>
-      <div class="field" style="flex:1 1 10em">
-        <label for="rate">Playback speed</label>
-        <select class="select" id="rate">
-          <option value="0.5">0.5×</option>
-          <option value="1" selected>1×</option>
-          <option value="1.5">1.5×</option>
-          <option value="2">2×</option>
-        </select>
+      <div style="flex:2 1 18em;min-width:14em">
+        <div class="flow">
+          <button type="button" class="btn btn-primary" id="play"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg><span id="play-label">Play overview</span></button>
+          <button type="button" class="btn btn-line" id="replay">Replay from start</button>
+          <button type="button" class="btn btn-stop" id="stop">Stop all sound (Esc)</button>
+        </div>
+        <fieldset class="hear-set" id="hear-set">
+          <legend>Clusters to hear</legend>
+          <div class="hear-boxes" id="hear-boxes"></div>
+        </fieldset>
+        <p class="hint" id="hear-note" role="status" aria-live="polite" aria-atomic="true">Cluster choices will appear when the summary loads.</p>
+        <div class="cues" id="wave" aria-hidden="true">
+          <div class="cue"><span>Tone</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
+          <div class="cue"><span>Pulses</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
+        </div>
+        <p class="hint">Each cluster keeps its own tone. Faster pulses mean that cluster is closer to the Point of Audio. Farther cells tap more slowly.</p>
+        <div class="field">
+          <label for="pos">Position in video</label>
+          <input id="pos" type="range" min="0" max="200" value="0" aria-valuetext="0 hours 0 minutes of 16 hours 40 minutes">
+          <p class="hint" id="pos-visible" aria-hidden="true">0 hours 0 minutes of 16 hours 40 minutes</p>
+        </div>
+        <div class="split">
+          <div class="field" style="flex:1 1 10em">
+            <label for="rate">Playback speed</label>
+            <select class="select" id="rate">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1 1 12em">
+            <label for="vol">App volume</label>
+            <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent" aria-describedby="vol-hint">
+            <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <label class="check-label"><input type="checkbox" id="move-end" checked> When the sound ends, move to the description</label>
+        </div>
+        <p class="hint">Left and right is a small extra cue. A cell to the left of the Point of Audio plays a little toward the left ear, and a cell to the right plays a little toward the right ear. The tone stays the one for that cluster.</p>
+        <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Ready. Press Play overview to start. Sound never plays on its own.</p>
       </div>
-      <div class="field" style="flex:1 1 12em">
-        <label for="vol">App volume</label>
-        <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent" aria-describedby="vol-hint">
-        <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader.</p>
-      </div>
     </div>
-    <div class="flow">
-      <label class="check-label"><input type="checkbox" id="move-end" checked> When the sound ends, move to the description</label>
-    </div>
-    <p class="hint">Left and right is a small extra cue. A cell to the left of the Point of Audio plays a little toward the left ear, and a cell to the right plays a little toward the right ear. The tone stays the one for that cluster.</p>
-    <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Ready. Press Play overview to start. Sound never plays on its own.</p>
-  </section>
-
-  <section class="card" aria-labelledby="video-h" id="cluster-video-card" hidden>
-    <div class="copy">
-      <h2 id="video-h">Cluster tracking video</h2>
-      <p class="hint">Each chunk is a fixed-radius circle around its center on the tracked frames — the same balls used for clustering.</p>
-    </div>
-    <video id="cluster-video" controls playsinline style="width:100%;max-width:28rem;border-radius:12px;background:#000"></video>
   </section>
 
   <section class="card" aria-labelledby="trace-h">

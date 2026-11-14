@@ -16,6 +16,8 @@ const pitchFill = document.getElementById("pitch-fill");
 const beatDots = document.querySelectorAll("#beat-dots i");
 const moveEnd = document.getElementById("move-end");
 const rate = document.getElementById("rate");
+const clusterVideo = document.getElementById("cluster-video");
+const clusterVideoWrap = document.getElementById("cluster-video-wrap");
 
 let summary = null;
 let traces = null;
@@ -28,6 +30,30 @@ let timer = null;
 let tone = null;
 let traceFollows = false;
 const heard = {};
+
+function playRatio() {
+  return totalFrames ? Math.max(0, Math.min(1, frame / totalFrames)) : 0;
+}
+
+function syncClusterVideo(shouldPlay) {
+  if (!clusterVideo || !clusterVideo.src) return;
+  const ratio = playRatio();
+  const duration = Number(clusterVideo.duration);
+  if (Number.isFinite(duration) && duration > 0) {
+    const target = Math.min(duration - 0.04, ratio * duration);
+    if (!Number.isFinite(clusterVideo.currentTime) || Math.abs(clusterVideo.currentTime - target) > 0.08) {
+      try { clusterVideo.currentTime = Math.max(0, target); } catch (error) { /* not seekable yet */ }
+    }
+  }
+  clusterVideo.playbackRate = Number(rate.value || 1);
+  clusterVideo.muted = true;
+  if (shouldPlay) {
+    const playPromise = clusterVideo.play();
+    if (playPromise && playPromise.catch) playPromise.catch(function () { /* autoplay may wait for gesture */ });
+  } else {
+    clusterVideo.pause();
+  }
+}
 
 function say(text) {
   if (statusText.textContent !== text) statusText.textContent = text;
@@ -81,6 +107,7 @@ function halt(message) {
   clearInterval(timer);
   timer = null;
   stopAllSound(true);
+  syncClusterVideo(false);
   setPlaying(false);
   if (message) say(message);
 }
@@ -89,6 +116,7 @@ function finish() {
   if (!playing) return;
   frame = totalFrames;
   showPosition();
+  syncClusterVideo(false);
   halt("Overview finished.");
   if (moveEnd.checked) {
     const heading = document.getElementById("desc-h");
@@ -102,6 +130,7 @@ function followRecording() {
   showPosition();
   paintCues();
   drawTraces();
+  syncClusterVideo(true);
 }
 
 function clusterRows() {
@@ -177,10 +206,11 @@ function begin() {
   if (frame >= totalFrames) frame = 0;
   traceFollows = true;
   showPosition();
+  syncClusterVideo(true);
   const plan = mixPlan();
   tone = playMix(plan.urls, {
     rate: Number(rate.value || 1),
-    ratio: totalFrames ? frame / totalFrames : 0,
+    ratio: playRatio(),
     heard: plan.heard,
     onEnded: finish,
     onError: function () {
@@ -188,7 +218,7 @@ function begin() {
     }
   });
   setPlaying(true);
-  say("Playing from " + positionWords() + ". " + heardSentence());
+  say("Playing with the cluster video from " + positionWords() + ". " + heardSentence());
   drawTraces();
   clearInterval(timer);
   timer = setInterval(followRecording, 100);
@@ -393,15 +423,17 @@ function fillSummary() {
   const explore = document.getElementById("explore");
   explore.textContent = "Explore the " + (pop.n_clusters || 0) + " chunks";
   explore.href = hrefWithJob("clusters.html");
-  const videoCard = document.getElementById("cluster-video-card");
-  const video = document.getElementById("cluster-video");
-  if (traces && traces.cluster_video_url && videoCard && video) {
-    video.src = "/api/jobs/" + encodeURIComponent(jobId) + "/clusters_overlay.mp4";
-    videoCard.hidden = false;
-  } else if (videoCard) {
-    videoCard.hidden = true;
+  if (traces && traces.cluster_video_url && clusterVideo && clusterVideoWrap) {
+    clusterVideo.src = "/api/jobs/" + encodeURIComponent(jobId) + "/clusters_overlay.mp4?v=" + Date.now();
+    clusterVideoWrap.hidden = false;
+    clusterVideo.onloadedmetadata = function () {
+      syncClusterVideo(false);
+    };
+  } else if (clusterVideoWrap) {
+    clusterVideoWrap.hidden = true;
   }
   showPosition();
+  syncClusterVideo(false);
 }
 
 function buildCards() {
@@ -452,6 +484,7 @@ document.addEventListener("cellsound-stopped", function () {
   if (!playing) return;
   clearInterval(timer);
   timer = null;
+  syncClusterVideo(false);
   setPlaying(false);
   say("All sound stopped.");
 });
@@ -461,8 +494,9 @@ position.addEventListener("input", function () {
   traceFollows = true;
   showPosition();
   paintCues();
-  if (tone && totalFrames) tone.seekRatio(frame / totalFrames);
+  if (tone && totalFrames) tone.seekRatio(playRatio());
   if (traces) drawTraces();
+  syncClusterVideo(playing);
 });
 
 volume.addEventListener("input", function () {
@@ -474,7 +508,9 @@ volume.addEventListener("input", function () {
 });
 
 rate.addEventListener("change", function () {
-  if (tone) tone.setRate(Number(rate.value || 1));
+  const next = Number(rate.value || 1);
+  if (tone) tone.setRate(next);
+  if (clusterVideo) clusterVideo.playbackRate = next;
 });
 
 document.getElementById("trace-show").addEventListener("change", drawTraces);
@@ -496,6 +532,7 @@ if (pauseButton) {
 
 window.addEventListener("pagehide", function () {
   clearInterval(timer);
+  syncClusterVideo(false);
   stopAllSound(true);
 });
 

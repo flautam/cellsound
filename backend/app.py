@@ -74,7 +74,7 @@ def _preview_frame(frame):
     if np.issubdtype(image.dtype, np.floating):
         image = image.astype(np.float32)
         peak = float(np.nanmax(image)) if image.size else 0.0
-        # Movies stored as 0–1 would otherwise clip to a black thumbnail.
+        # Float stacks are often ~0–1 with a little headroom above 1.0.
         if peak <= 1.5:
             image = image * 255.0
         image = np.clip(np.rint(image), 0, 255).astype(np.uint8)
@@ -157,12 +157,20 @@ def _track(job_id: str, video_path: Path) -> None:
                 gray_u8 = gray_u8[np.newaxis, ...]
             rgb = np.stack([gray_u8, gray_u8, gray_u8], axis=-1)
             tmp = folder / "tracked.tmp.mp4"
-            writer = cv2.VideoWriter(
-                str(tmp),
-                cv2.VideoWriter_fourcc(*"mp4v"),
-                float(source_fps),
-                (width, height),
-            )
+            writer = None
+            for tag in ("avc1", "H264", "mp4v"):
+                candidate = cv2.VideoWriter(
+                    str(tmp),
+                    cv2.VideoWriter_fourcc(*tag),
+                    float(source_fps),
+                    (width, height),
+                )
+                if candidate.isOpened():
+                    writer = candidate
+                    break
+                candidate.release()
+            if writer is None:
+                raise RuntimeError("Could not open VideoWriter for tracked.mp4")
             for frame in rgb:
                 writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
             writer.release()
@@ -407,6 +415,17 @@ def clusters_overlay(job_id: str):
             content={"error": "missing_video", "message": "The cluster overlay video is not ready yet."},
         )
     return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/jobs/{job_id}/clusters_map.png")
+def clusters_map(job_id: str):
+    path = _job_dir(job_id) / "clusters_map.png"
+    if not path.exists():
+        return JSONResponse(
+            status_code=404,
+            content={"error": "missing_map", "message": "The cluster map image is not ready yet."},
+        )
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/jobs/{job_id}/export.zip")

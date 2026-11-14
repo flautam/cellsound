@@ -205,6 +205,8 @@ def run_job_analysis(
                 fps=overlay_fps,
             )
             traces["cluster_video_url"] = "clusters_overlay.mp4"
+            if (folder / "clusters_map.png").exists():
+                traces["map_image_url"] = "clusters_map.png"
         except Exception as exc:
             traces["cluster_video_url"] = None
             traces["cluster_video_error"] = str(exc)

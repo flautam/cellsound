@@ -138,23 +138,32 @@ def render(
         out_frames.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Write with OpenCV mpeg4 so QuickTime/Finder play it as a real movie
-    # (imageio h264 often opens as a single still on macOS).
+    # Prefer H.264 (avc1) so the website <video> player can decode it.
+    # Fall back to mp4v for local QuickTime if avc1 is unavailable.
     tmp = out_path.with_suffix(".tmp.mp4")
     if tmp.exists():
         tmp.unlink()
-    writer = cv2.VideoWriter(
-        str(tmp),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        float(fps),
-        (w, h),
-    )
-    if not writer.isOpened():
+    writer = None
+    for tag in ("avc1", "H264", "mp4v"):
+        candidate = cv2.VideoWriter(
+            str(tmp),
+            cv2.VideoWriter_fourcc(*tag),
+            float(fps),
+            (w, h),
+        )
+        if candidate.isOpened():
+            writer = candidate
+            break
+        candidate.release()
+    if writer is None:
         raise RuntimeError(f"Could not open VideoWriter for {tmp}")
     for rgb in out_frames:
         writer.write(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
     writer.release()
     tmp.replace(out_path)
+    # Still of the last overlay frame — same circles as the video, for the chunk map.
+    map_path = out_path.with_name("clusters_map.png")
+    iio.imwrite(map_path, out_frames[-1])
     return out_path
 
 
