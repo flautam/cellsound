@@ -144,18 +144,11 @@
       </fieldset>
       <div class="panel panel-mint">
         <label class="panel-title" for="clusters">Number of clusters</label>
-        <p id="k-hint" class="hint">More clusters means finer differences between cell behaviors.</p>
-        <p class="big-num" id="cluster-num" aria-hidden="true">5</p>
-        <input id="clusters" type="range" min="2" max="10" step="1" value="5" aria-valuetext="5 clusters" aria-describedby="k-hint">
+        <p id="k-hint" class="hint">Chunks are spatial neighborhoods (fixed-radius circles around each chunk center). More clusters means more neighborhoods across the field.</p>
+        <p class="big-num" id="cluster-num" aria-hidden="true">8</p>
+        <input id="clusters" type="range" min="2" max="10" step="1" value="8" aria-valuetext="8 clusters" aria-describedby="k-hint">
         <div class="ends" aria-hidden="true"><span>2</span><span>10</span></div>
       </div>
-    </div>
-    <div class="panel panel-peach">
-      <label class="panel-title" for="basis">Clustering basis: position vs. velocity</label>
-      <p id="basis-hint" class="hint">When cells are grouped, how much should <strong>position</strong> (where a cell is: x, y) count compared with <strong>velocity</strong> (how it moves: speed and direction)?</p>
-      <p class="pill" id="basis-word" aria-hidden="true">Equal weight</p>
-      <input id="basis" type="range" min="0" max="100" step="25" value="50" aria-valuetext="Equal weight" aria-describedby="basis-hint">
-      <div class="ends" aria-hidden="true"><span><strong>Position</strong><br>x, y</span><span style="text-align:right"><strong>Velocity</strong><br>speed, direction</span></div>
     </div>
     <fieldset class="panel panel-sky">
       <legend class="panel-title">Volume level by distance</legend>

@@ -28,8 +28,9 @@ def build_cluster_traces(
     height: int,
     poa_x: float,
     poa_y: float,
+    max_radius: float = DEFAULT_MAX_RADIUS,
 ) -> dict:
-    """Centroid trails as SVG-friendly paths (one path per cluster)."""
+    """Centroid trails + fixed-radius circles (same balls as the overlay video)."""
     color_of = {
         int(c["cluster_id"]): c.get("color", "#6E9BFF")
         for c in summary_json.get("clusters", [])
@@ -43,11 +44,13 @@ def build_cluster_traces(
             picked = np.linspace(0, len(pts) - 1, 50).astype(int)
             pts = pts[picked]
         path = [[_num(x), _num(y)] for x, y in pts]
+        end = path[-1] if path else [0.0, 0.0]
         clusters.append(
             {
                 "cluster_id": int(cid),
                 "color": color_of.get(int(cid), "#6E9BFF"),
                 "paths": [path],
+                "centroid": {"x": end[0], "y": end[1]},
             }
         )
     n_cells = int(summary_json.get("population", {}).get("n_cells") or 0)
@@ -56,10 +59,11 @@ def build_cluster_traces(
         "width": int(width),
         "height": int(height),
         "poa": {"x": float(poa_x), "y": float(poa_y)},
+        "max_radius": float(max_radius),
         "clusters": clusters,
         "description": (
-            f"Centroid trails for {len(clusters)} chunks from {n_cells} cells "
-            f"over {n_frames} frames. The Point of Audio is marked."
+            f"Fixed-radius chunk circles and centroid trails for {len(clusters)} chunks "
+            f"from {n_cells} cells over {n_frames} frames. The Point of Audio is marked."
         ),
         "cluster_video_url": "clusters_overlay.mp4",
     }
@@ -138,6 +142,7 @@ def run_job_analysis(
             "width": int(width),
             "height": int(height),
             "poa": {"x": poa_x, "y": poa_y},
+            "max_radius": float(max_radius),
             "clusters": [],
             "description": "No cluster trails yet.",
             "cluster_video_url": None,
@@ -181,7 +186,9 @@ def run_job_analysis(
     timeseries.to_csv(folder / "cluster_timeseries.csv", index=False)
     (folder / "summary.json").write_text(json.dumps(summary, indent=2))
 
-    traces = build_cluster_traces(cluster_summary, summary, width, height, poa_x, poa_y)
+    traces = build_cluster_traces(
+        cluster_summary, summary, width, height, poa_x, poa_y, max_radius=max_radius
+    )
     # Prefer the cropped/selected tracking clip; fall back to the upload.
     video_path = folder / "tracked.mp4"
     if not video_path.exists():

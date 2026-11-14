@@ -113,7 +113,7 @@
   <section class="card" aria-labelledby="video-h" id="cluster-video-card" hidden>
     <div class="copy">
       <h2 id="video-h">Cluster tracking video</h2>
-      <p class="hint">Chunks drawn on the tracked frames. Watch the overview story, then open clusters for each chunk.</p>
+      <p class="hint">Each chunk is a fixed-radius circle around its center on the tracked frames — the same balls used for clustering.</p>
     </div>
     <video id="cluster-video" controls playsinline style="width:100%;max-width:28rem;border-radius:12px;background:#000"></video>
   </section>
@@ -121,8 +121,8 @@
   <section class="card" aria-labelledby="trace-h">
     <div class="hero-bar">
         <div class="copy">
-        <h2 id="trace-h">Chunk trails</h2>
-        <p class="hint">Each chunk's center path over time, colored by chunk.</p>
+        <h2 id="trace-h">Chunk circles and trails</h2>
+        <p class="hint">Same fixed-radius circles, plus each chunk center's path over time.</p>
       </div>
       <div class="field">
         <label for="trace-show">Show</label>

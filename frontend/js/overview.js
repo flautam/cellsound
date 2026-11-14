@@ -154,6 +154,7 @@ function drawTraces() {
   image.setAttribute("href", imageUrl);
   image.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageUrl);
   paths.replaceChildren();
+  const radius = Number(traces.max_radius || 28);
   traces.clusters.forEach(function (cluster) {
     const group = ns("g");
     const selected = show === "all" || show === String(cluster.cluster_id);
@@ -177,6 +178,20 @@ function drawTraces() {
       group.appendChild(halo);
       group.appendChild(line);
     });
+    const center = cluster.centroid || (cluster.paths && cluster.paths[0] && cluster.paths[0].length
+      ? { x: cluster.paths[0][cluster.paths[0].length - 1][0], y: cluster.paths[0][cluster.paths[0].length - 1][1] }
+      : null);
+    if (center) {
+      const ball = ns("circle");
+      ball.setAttribute("cx", String(center.x));
+      ball.setAttribute("cy", String(center.y));
+      ball.setAttribute("r", String(radius));
+      ball.setAttribute("fill", cluster.color);
+      ball.setAttribute("fill-opacity", "0.12");
+      ball.setAttribute("stroke", cluster.color);
+      ball.setAttribute("stroke-width", String(2 * scale));
+      group.appendChild(ball);
+    }
     paths.appendChild(group);
   });
   const poa = traces.poa || { x: 256, y: 256 };

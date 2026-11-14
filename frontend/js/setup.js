@@ -1,6 +1,5 @@
 /* Point of Audio: move a point with buttons or numbers, then run analysis. */
 const FILLS = ["var(--sun)", "var(--butter)", "var(--on-header)", "var(--primary)"];
-const BASIS = ["Position only", "Mostly position", "Equal weight", "Mostly velocity", "Velocity only"];
 const INSTRUMENTS = ["piano", "marimba", "cello", "flute", "bell"];
 
 const statusText = document.getElementById("status-text");
@@ -12,7 +11,6 @@ const stepSelect = document.getElementById("step");
 const xInput = document.getElementById("px-x");
 const yInput = document.getElementById("px-y");
 const clusterSlider = document.getElementById("clusters");
-const basisSlider = document.getElementById("basis");
 const nearSlider = document.getElementById("vol-near");
 const midSlider = document.getElementById("vol-mid");
 const farSlider = document.getElementById("vol-far");
@@ -125,15 +123,9 @@ function scheduleMove() {
   }, 250);
 }
 
-function basisWord() {
-  return BASIS[Math.round(Number(basisSlider.value) / 25)] || "Equal weight";
-}
-
 function refreshSliders() {
   clusterSlider.setAttribute("aria-valuetext", clusterSlider.value + " clusters");
   document.getElementById("cluster-num").textContent = clusterSlider.value;
-  basisSlider.setAttribute("aria-valuetext", basisWord());
-  document.getElementById("basis-word").textContent = basisWord();
   nearSlider.setAttribute("aria-valuetext", "Closest third volume level, " + nearSlider.value + " percent");
   midSlider.setAttribute("aria-valuetext", "Middle third volume level, " + midSlider.value + " percent");
   farSlider.setAttribute("aria-valuetext", "Farthest third volume level, " + farSlider.value + " percent");
@@ -152,7 +144,6 @@ function analysisBody() {
     poa: { x: poa.x, y: poa.y },
     pitch_mode: document.querySelector('input[name="pitch"]:checked').value,
     n_clusters: count,
-    position_weight: 1 - Number(basisSlider.value) / 100,
     volume_levels: {
       closest: Number(nearSlider.value),
       middle: Number(midSlider.value),
@@ -202,7 +193,7 @@ stepSelect.addEventListener("change", function () {
 
 xInput.addEventListener("input", scheduleMove);
 yInput.addEventListener("input", scheduleMove);
-[clusterSlider, basisSlider, nearSlider, midSlider, farSlider].forEach(function (slider) {
+[clusterSlider, nearSlider, midSlider, farSlider].forEach(function (slider) {
   slider.addEventListener("input", refreshSliders);
 });
 
@@ -216,8 +207,7 @@ reverseBox.addEventListener("change", function () {
 
 document.getElementById("reset").addEventListener("click", function () {
   document.querySelector('input[name="pitch"][value="radial"]').checked = true;
-  clusterSlider.value = "5";
-  basisSlider.value = "50";
+  clusterSlider.value = "8";
   nearSlider.value = "100";
   midSlider.value = "50";
   farSlider.value = "25";

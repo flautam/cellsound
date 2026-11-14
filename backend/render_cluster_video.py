@@ -1,4 +1,4 @@
-"""Overlay cluster hulls + centroid trails on a video (one enclosure per cluster)."""
+"""Overlay fixed-radius cluster circles + centroid trails on a video."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import cv2
 import imageio.v3 as iio
 import numpy as np
 import pandas as pd
-from scipy.spatial import ConvexHull
+
+from backend.cluster import DEFAULT_MAX_RADIUS
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -33,47 +34,13 @@ def color_for(cluster_id: int) -> tuple[int, int, int]:
     return COLORS_BGR[(int(cluster_id) - 1) % len(COLORS_BGR)]
 
 
-def draw_hull(frame_bgr: np.ndarray, pts: np.ndarray, color, thickness: int = 2) -> None:
-    """Draw a convex enclosure around points (N,2) in x,y image coords."""
-    if len(pts) == 0:
-        return
-    pts_i = np.round(pts).astype(np.int32)
-    if len(pts_i) == 1:
-        cv2.circle(frame_bgr, (int(pts_i[0, 0]), int(pts_i[0, 1])), 6, color, thickness)
-        return
-    if len(pts_i) == 2:
-        cv2.line(
-            frame_bgr,
-            (int(pts_i[0, 0]), int(pts_i[0, 1])),
-            (int(pts_i[1, 0]), int(pts_i[1, 1])),
-            color,
-            thickness,
-        )
-        for p in pts_i:
-            cv2.circle(frame_bgr, (int(p[0]), int(p[1])), 4, color, -1)
-        return
-    try:
-        hull = ConvexHull(pts)
-        poly = pts_i[hull.vertices].reshape(-1, 1, 2)
-    except Exception:
-        # Fallback: axis-aligned box
-        x0, y0 = pts_i.min(axis=0)
-        x1, y1 = pts_i.max(axis=0)
-        cv2.rectangle(frame_bgr, (int(x0), int(y0)), (int(x1), int(y1)), color, thickness)
-        return
-    cv2.polylines(frame_bgr, [poly], isClosed=True, color=color, thickness=thickness)
-    overlay = frame_bgr.copy()
-    cv2.fillPoly(overlay, [poly], color)
-    cv2.addWeighted(overlay, 0.12, frame_bgr, 0.88, 0, frame_bgr)
-
-
 def render(
     video_path: Path,
     motion_path: Path,
     clusters_path: Path,
     summary_path: Path,
     out_path: Path,
-    max_radius: float = 35.0,
+    max_radius: float = DEFAULT_MAX_RADIUS,
     fps: float | None = None,
 ) -> Path:
     motion = pd.read_csv(motion_path)
@@ -99,6 +66,7 @@ def render(
     if out_fps <= 0:
         out_fps = 15.0
     fps = out_fps
+    radius = int(round(float(max_radius)))
 
     cx_col = "centroid_x" if "centroid_x" in summary.columns else "mean_x"
     cy_col = "centroid_y" if "centroid_y" in summary.columns else "mean_y"
@@ -117,29 +85,16 @@ def render(
         fdf = merged[merged["frame"] == f_idx]
         sdf = summary[summary["frame"] == f_idx]
 
-        # Non-overlapping circle enclosures at algorithm centroids
+        # Same max-radius balls as the clustering algorithm / XY plot.
         for _, row in sdf.iterrows():
             cid = int(row["cluster_id"])
             color = color_for(cid)
             cx, cy = float(row[cx_col]), float(row[cy_col])
-            cv2.circle(
-                bgr,
-                (int(round(cx)), int(round(cy))),
-                int(round(max_radius)),
-                color,
-                2,
-                lineType=cv2.LINE_AA,
-            )
+            center = (int(round(cx)), int(round(cy)))
             overlay = bgr.copy()
-            cv2.circle(
-                overlay,
-                (int(round(cx)), int(round(cy))),
-                int(round(max_radius)),
-                color,
-                -1,
-                lineType=cv2.LINE_AA,
-            )
+            cv2.circle(overlay, center, radius, color, -1, lineType=cv2.LINE_AA)
             cv2.addWeighted(overlay, 0.10, bgr, 0.90, 0, bgr)
+            cv2.circle(bgr, center, radius, color, 2, lineType=cv2.LINE_AA)
 
         for cid, g in fdf.groupby("cluster_id"):
             color = color_for(int(cid))
@@ -156,7 +111,6 @@ def render(
                 p0 = (int(round(pts[i - 1][0])), int(round(pts[i - 1][1])))
                 p1 = (int(round(pts[i][0])), int(round(pts[i][1])))
                 cv2.line(bgr, p0, p1, color, 2, lineType=cv2.LINE_AA)
-            # current average position
             cx, cy = pts[-1]
             cv2.circle(bgr, (int(round(cx)), int(round(cy))), 5, color, -1)
             cv2.circle(bgr, (int(round(cx)), int(round(cy))), 5, (255, 255, 255), 1)
@@ -205,7 +159,7 @@ def render(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Render cluster hull video.")
+    p = argparse.ArgumentParser(description="Render fixed-radius cluster circle video.")
     p.add_argument(
         "--video",
         type=Path,
@@ -222,7 +176,7 @@ def main() -> None:
     p.add_argument(
         "--max-radius",
         type=float,
-        default=28.0,
+        default=DEFAULT_MAX_RADIUS,
         help="Cluster circle radius in pixels (should match clustering).",
     )
     args = p.parse_args()
