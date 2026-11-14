@@ -1,0 +1,14 @@
+numpy
+pandas
+scipy
+scikit-learn
+scikit-image
+imageio
+imageio-ffmpeg
+tifffile
+cellpose
+trackastra
+soundfile
+fastapi
+uvicorn
+python-multipart
