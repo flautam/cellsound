@@ -1,5 +1,5 @@
-/* Every network call lives here. Mock data is used until the backend exists. */
-const USE_MOCK = true;
+/* Every network call lives here. The FastAPI server in backend/app.py answers these. */
+const USE_MOCK = false;
 
 const mockRun = {
   frame: 0,

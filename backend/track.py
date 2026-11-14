@@ -14,8 +14,12 @@ from cellpose import models
 from trackastra.model import Trackastra
 from trackastra.tracking.utils import graph_to_napari_tracks
 
-# Running this file as `python backend/track.py` puts backend/ on the path.
-from video import load_video
+# `python backend/track.py` puts backend/ on the path. The website imports this
+# file as part of the backend package, so both import styles are accepted.
+try:
+    from video import load_video
+except ModuleNotFoundError:
+    from backend.video import load_video
 
 # Project root is the folder that contains backend/ and output/.
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,20 +85,24 @@ def select_frames(video, frames, crop):
     return np.ascontiguousarray(video)
 
 
-def segment_nuclei(video, device):
+def segment_nuclei(video, device, on_frame=None):
     """Label nuclei in each frame with the pretrained Cellpose model.
 
     Returns an integer array of the same shape as video. 0 is background.
     Each frame is numbered on its own; Trackastra links those numbers later.
+    on_frame(done, total) is optional and is called after each frame.
     """
     model = models.CellposeModel(device=device, pretrained_model=CELLPOSE_MODEL)
     # One tile at a time on CPU. A GPU can take the library's usual batch.
     batch_size = CPU_BATCH_SIZE if device.type == "cpu" else 8
     masks = np.empty(video.shape, dtype=np.int32)
-    for index in range(video.shape[0]):
+    total = int(video.shape[0])
+    for index in range(total):
         # One frame, not a list of the whole video.
         mask, _flows, _styles = model.eval(video[index], batch_size=batch_size)
         masks[index] = mask
+        if on_frame is not None:
+            on_frame(index + 1, total)
     return masks
 
 

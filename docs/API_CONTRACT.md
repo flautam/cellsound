@@ -6,14 +6,14 @@ All URLs are relative (`/api/...`), so the same code works locally, on Coder, an
 
 | # | Endpoint | Ready? |
 |---|---|---|
-| 1 | `POST /api/jobs` | ☐ |
-| 2 | `GET /api/jobs/{job_id}` | ☐ |
-| 3 | `GET /api/jobs/{job_id}/frame0` | ☐ |
-| 4 | `POST /api/jobs/{job_id}/analyze` | ☐ |
-| 5 | `GET /api/jobs/{job_id}/summary` | ☐ |
-| 6 | `GET /api/jobs/{job_id}/traces` | ☐ |
-| 7 | `GET /api/jobs/{job_id}/audio/{name}.wav` | ☐ |
-| 8 | `GET /api/jobs/{job_id}/export.zip?include=audio,text,data,settings` | ☐ |
+| 1 | `POST /api/jobs` | ☑ |
+| 2 | `GET /api/jobs/{job_id}` | ☑ |
+| 3 | `GET /api/jobs/{job_id}/frame0` | ☑ |
+| 4 | `POST /api/jobs/{job_id}/analyze` | ☑ |
+| 5 | `GET /api/jobs/{job_id}/summary` | ☑ |
+| 6 | `GET /api/jobs/{job_id}/traces` | ☑ |
+| 7 | `GET /api/jobs/{job_id}/audio/{name}.wav` | ☑ |
+| 8 | `GET /api/jobs/{job_id}/export.zip?include=audio,text,data,settings` | ☑ |
 
 Key idea: **tracking runs once per video** (slow, GPU). Everything after it (motion, clusters, descriptions, sound) reruns quickly through `/analyze` whenever the user moves the Point of Audio or changes a setting.
 

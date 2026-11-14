@@ -230,6 +230,10 @@ getSummary(currentJobId() || "a1b2c3").then(function (data) {
   summary = data;
   clusters = (data.clusters || []).slice().sort(function (a, b) { return a.rank - b.rank; });
   document.getElementById("page-title").textContent = "Explore the " + clusters.length + " clusters";
+  if (!clusters.length) {
+    say("No cells were tracked, so there are no clusters to explore.");
+    return;
+  }
   buildList();
   showDetail();
   const first = selected();
