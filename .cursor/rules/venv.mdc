@@ -1,0 +1,14 @@
+---
+description: Always use the project virtual environment
+alwaysApply: true
+---
+
+# Virtual environment
+
+This project uses `.venv`. Activate it before any Python or pip command, and do not ask the user to activate it.
+
+```bash
+source .venv/bin/activate
+```
+
+If the shell cannot source the script, call `.venv/bin/python` and `.venv/bin/pip` directly.

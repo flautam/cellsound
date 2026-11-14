@@ -1,0 +1,18 @@
+---
+description: Ask for the partner's MP4 path and show how to test video loading and tracking
+alwaysApply: true
+---
+
+# Test with the partner's MP4
+
+At the start of a conversation, before other work, tell the partner how to test phases 5.1–5.2.
+
+The video is a command-line path. There is no upload page. Ask for the full path to their MP4, then show these commands with that path:
+
+```bash
+source .venv/bin/activate
+python backend/video.py /path/to/their_video.mp4
+python backend/track.py /path/to/their_video.mp4 --frames 25 --crop 256
+```
+
+Tracking writes `output/tracks.csv` with columns `cell_id, frame, x, y`. `data/` and `output/` are gitignored. A folder of TIFF frames is an alternative input for `load_video`.
