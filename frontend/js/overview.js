@@ -28,6 +28,8 @@ let frame = 0;
 let playing = false;
 let timer = null;
 let tone = null;
+let traceFollows = false;
+const heard = {};
 
 function say(text) {
   if (statusText.textContent !== text) statusText.textContent = text;
@@ -110,27 +112,114 @@ function followRecording() {
   frame = Math.round(Math.min(1, tone.currentRatio()) * totalFrames);
   showPosition();
   paintCues();
+  drawTraces();
+}
+
+function clusterRows() {
+  return (summary && summary.clusters) || [];
+}
+
+function isHeard(id) {
+  const key = Number(id);
+  if (!Object.prototype.hasOwnProperty.call(heard, key)) return true;
+  return Boolean(heard[key]);
+}
+
+function mixPlan() {
+  const rows = clusterRows();
+  return {
+    urls: rows.map(function (cluster) {
+      return audioUrl(jobId, cluster.audio || ("cluster_" + cluster.cluster_id));
+    }),
+    heard: rows.map(function (cluster) { return isHeard(cluster.cluster_id); })
+  };
+}
+
+function heardSentence() {
+  const chosen = clusterRows().filter(function (cluster) { return isHeard(cluster.cluster_id); });
+  if (!chosen.length) return "No clusters are in the overview sound. Check a box to bring one back.";
+  const names = chosen.map(function (cluster) { return "cluster " + cluster.cluster_id; });
+  if (chosen.length === clusterRows().length) return "Hearing every cluster: " + names.join(", ") + ".";
+  return "Hearing " + names.join(", ") + ". The others are quiet.";
+}
+
+function syncHeard() {
+  const note = document.getElementById("hear-note");
+  if (note) note.textContent = heardSentence();
+  if (tone && tone.setHeard) tone.setHeard(mixPlan().heard);
+  if (traces) drawTraces();
+}
+
+function buildHearBoxes() {
+  const box = document.getElementById("hear-boxes");
+  if (!box) return;
+  box.replaceChildren();
+  const rows = clusterRows();
+  const many = rows.length > 2;
+  rows.forEach(function (cluster) {
+    const id = Number(cluster.cluster_id);
+    if (!Object.prototype.hasOwnProperty.call(heard, id)) {
+      heard[id] = many ? (id === 1 || id === 2) : true;
+    }
+    const label = document.createElement("label");
+    label.className = "check-label";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = "hear-" + id;
+    input.checked = heard[id];
+    const text = document.createElement("span");
+    text.textContent = "Cluster " + id + ", " + cluster.name + ", " + (cluster.instrument || "piano");
+    input.addEventListener("change", function () {
+      heard[id] = input.checked;
+      syncHeard();
+    });
+    label.appendChild(input);
+    label.appendChild(text);
+    box.appendChild(label);
+  });
+  syncHeard();
 }
 
 function begin() {
+  if (!clusterRows().length) {
+    say("The cluster recordings are not ready yet.");
+    return;
+  }
   if (frame >= totalFrames) frame = 0;
+  traceFollows = true;
   showPosition();
-  tone = playRecording(audioUrl(jobId, "overview"), {
+  const plan = mixPlan();
+  tone = playMix(plan.urls, {
     rate: Number(rate.value || 1),
     ratio: totalFrames ? frame / totalFrames : 0,
+    heard: plan.heard,
     onEnded: finish,
     onError: function () {
       halt("The overview recording could not play.");
     }
   });
   setPlaying(true);
-    say("Playing the overview. Each cluster uses its own instrument, from " + positionWords() + ".");
+  say("Playing from " + positionWords() + ". " + heardSentence());
+  drawTraces();
   clearInterval(timer);
-  timer = setInterval(followRecording, 200);
+  timer = setInterval(followRecording, 100);
 }
 
 function ns(name) {
   return document.createElementNS("http://www.w3.org/2000/svg", name);
+}
+
+function clipPath(path, ratio) {
+  if (ratio == null || !path.length) return path;
+  const framed = path[0].length > 2;
+  if (framed) {
+    const maxFrame = traces.max_frame != null ? Number(traces.max_frame) : Number(path[path.length - 1][2]);
+    const limit = ratio * maxFrame;
+    const shown = path.filter(function (point) { return Number(point[2]) <= limit + 0.001; });
+    return shown.length ? shown : [path[0]];
+  }
+  const keep = Math.max(1, Math.round(path.length * ratio));
+  return path.slice(0, keep);
 }
 
 function drawTraces() {
@@ -148,19 +237,41 @@ function drawTraces() {
   backdrop.setAttribute("width", String(width));
   backdrop.setAttribute("height", String(height));
   const image = document.getElementById("trace-image");
-  const imageUrl = traces.image_url || frameImageUrl(jobId);
+  const ratio = traceFollows && totalFrames ? Math.max(0, Math.min(1, frame / totalFrames)) : null;
+  let imageUrl = traces.image_url || frameImageUrl(jobId);
+  if (ratio != null && traces.frames_url && Number(traces.frame_count) > 0) {
+    const last = Math.max(0, Number(traces.frame_count) - 1);
+    imageUrl = frameStepUrl(jobId, Math.round(ratio * last), traces.frames_url);
+  }
   image.setAttribute("width", String(width));
   image.setAttribute("height", String(height));
-  image.setAttribute("href", imageUrl);
-  image.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageUrl);
+  if (image.getAttribute("href") !== imageUrl) {
+    image.setAttribute("href", imageUrl);
+    image.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageUrl);
+  }
+  if (ratio != null) svg.setAttribute("data-step", String(frame));
+  else svg.removeAttribute("data-step");
   paths.replaceChildren();
   const radius = Number(traces.max_radius || 28);
   traces.clusters.forEach(function (cluster) {
     const group = ns("g");
     const selected = show === "all" || show === String(cluster.cluster_id);
-    group.setAttribute("opacity", selected ? "1" : "0.12");
-    (cluster.paths || []).forEach(function (path) {
-      const points = path.map(function (point) { return point[0] + "," + point[1]; }).join(" ");
+    const on = isHeard(cluster.cluster_id);
+    group.setAttribute("opacity", selected && on ? "1" : "0.12");
+    let head = null;
+    (cluster.paths || []).forEach(function (path, pathIndex) {
+      const shown = clipPath(path, ratio);
+      if (pathIndex === 0 && shown.length) head = shown[shown.length - 1];
+      if (shown.length === 1) {
+        const dot = ns("circle");
+        dot.setAttribute("cx", String(shown[0][0]));
+        dot.setAttribute("cy", String(shown[0][1]));
+        dot.setAttribute("r", String(5 * scale));
+        dot.setAttribute("fill", cluster.color);
+        group.appendChild(dot);
+        return;
+      }
+      const points = shown.map(function (point) { return point[0] + "," + point[1]; }).join(" ");
       const halo = ns("polyline");
       halo.setAttribute("points", points);
       halo.setAttribute("fill", "none");
@@ -178,9 +289,9 @@ function drawTraces() {
       group.appendChild(halo);
       group.appendChild(line);
     });
-    const center = cluster.centroid || (cluster.paths && cluster.paths[0] && cluster.paths[0].length
-      ? { x: cluster.paths[0][cluster.paths[0].length - 1][0], y: cluster.paths[0][cluster.paths[0].length - 1][1] }
-      : null);
+    const center = (ratio != null && head)
+      ? { x: head[0], y: head[1] }
+      : (cluster.centroid || (head ? { x: head[0], y: head[1] } : null));
     if (center) {
       const ball = ns("circle");
       ball.setAttribute("cx", String(center.x));
@@ -210,9 +321,15 @@ function drawTraces() {
     marker.appendChild(part);
   });
   const chosen = summary.clusters.find(function (cluster) { return String(cluster.cluster_id) === show; });
-  const words = show === "all" || !chosen
-    ? traces.description
-    : "Showing chunk " + chosen.cluster_id + ", " + chosen.name + ", only. Other chunks are faded.";
+  const heardIds = clusterRows().filter(function (cluster) { return isHeard(cluster.cluster_id); }).map(function (cluster) { return cluster.cluster_id; });
+  let words = traces.description;
+  if (!heardIds.length) words = "No clusters are in the overview sound. Chunk trails are faded.";
+  else if (heardIds.length < clusterRows().length) words = "Showing cluster " + heardIds.join(" and cluster ") + ". Other chunks are faded.";
+  if (show !== "all" && chosen) {
+    words = isHeard(chosen.cluster_id)
+      ? "Showing chunk " + chosen.cluster_id + ", " + chosen.name + ", only. Other chunks are faded."
+      : "Chunk " + chosen.cluster_id + " is faded because it is not in the overview sound.";
+  }
   title.textContent = words;
   svg.setAttribute("aria-label", words);
 }
@@ -250,7 +367,8 @@ function fillSummary() {
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem("cellsound-calibration") || "null"); } catch (error) { saved = null; }
   const minutes = saved && saved.minutes_per_frame ? Number(saved.minutes_per_frame) : 0;
-  const nFrames = Number(pop.n_frames || 0);
+  let nFrames = Number(pop.n_frames || 0);
+  if (!nFrames && !(minutes > 0 && pop.duration_min != null)) nFrames = Number(pop.duration_min || 0);
   timed = minutes > 0 && pop.duration_min != null;
   totalMinutes = timed ? Number(pop.duration_min) : nFrames;
   totalFrames = nFrames || (timed ? Math.max(1, Math.round(Number(pop.duration_min) / minutes)) : Math.max(1, Math.round(totalMinutes)));
@@ -351,9 +469,11 @@ document.addEventListener("cellsound-stopped", function () {
 
 position.addEventListener("input", function () {
   frame = Number(position.value);
+  traceFollows = true;
   showPosition();
   paintCues();
   if (tone && totalFrames) tone.seekRatio(frame / totalFrames);
+  if (traces) drawTraces();
 });
 
 volume.addEventListener("input", function () {
@@ -401,6 +521,7 @@ Promise.all([getSummary(jobId), getTraces(jobId)]).then(function (results) {
   if (summary.clusters) summary.clusters = summary.clusters.slice().sort(byClusterId);
   if (traces.clusters) traces.clusters = traces.clusters.slice().sort(byClusterId);
   fillSummary();
+  buildHearBoxes();
   fillLegend();
   drawTraces();
   paintCues();

@@ -223,12 +223,14 @@ def build_analysis(tracks: pd.DataFrame, settings: dict, width: int, height: int
         paths = []
         for cell_id in group["cell_ids"]:
             path = tracks[tracks["cell_id"] == cell_id].sort_values("frame")
-            points = path[["x", "y"]].to_numpy(dtype=float)
-            if len(points) > 50:
-                picked = np.linspace(0, len(points) - 1, 50).astype(int)
-                points = points[picked]
-            paths.append([[_num(x, 1), _num(y, 1)] for x, y in points])
+            framed = path[["frame", "x", "y"]].to_numpy(dtype=float)
+            if len(framed) > 50:
+                picked = np.linspace(0, len(framed) - 1, 50).astype(int)
+                framed = framed[picked]
+            paths.append([[_num(x, 1), _num(y, 1), int(frame)] for frame, x, y in framed])
         traces["clusters"].append(
             {"cluster_id": group["cluster_id"], "color": group["color"], "paths": paths}
         )
+    if not tracks.empty:
+        traces["max_frame"] = int(tracks["frame"].max())
     return summary, traces, motion

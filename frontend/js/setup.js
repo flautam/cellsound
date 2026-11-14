@@ -1,6 +1,6 @@
 /* Point of Audio: move a point with buttons or numbers, then run analysis. */
 const FILLS = ["var(--sun)", "var(--butter)", "var(--on-header)", "var(--primary)"];
-const INSTRUMENTS = ["piano", "marimba", "cello", "flute", "bell"];
+const INSTRUMENTS = ["piano", "marimba", "cello", "flute", "bell", "soft synth", "guitar", "trumpet", "violin", "choir"];
 
 const statusText = document.getElementById("status-text");
 const previewTitle = document.getElementById("preview-title");

@@ -275,6 +275,55 @@ def frame0(job_id: str):
     }
 
 
+def _video_file(folder: Path) -> Path | None:
+    for path in sorted(folder.glob("video.*")):
+        if path.is_file() and path.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv", ".webm"}:
+            return path
+    return None
+
+
+def save_step_frames(folder: Path, max_side: int = 480, limit: int = 360) -> int:
+    """Save a small JPEG of each video frame so the overview can step the picture."""
+    video_path = _video_file(folder)
+    dest = folder / "frames"
+    dest.mkdir(parents=True, exist_ok=True)
+    for old in dest.glob("*.jpg"):
+        old.unlink()
+    if video_path is None:
+        return 0
+    count = 0
+    try:
+        for index, frame in enumerate(iio.imiter(video_path)):
+            if index >= limit:
+                break
+            image = _preview_frame(frame)
+            picture = Image.fromarray(image)
+            width, height = picture.size
+            longest = max(width, height, 1)
+            if longest > max_side:
+                scale = max_side / longest
+                picture = picture.resize(
+                    (max(1, int(width * scale)), max(1, int(height * scale))),
+                    Image.Resampling.BILINEAR,
+                )
+            picture.save(dest / f"{index}.jpg", quality=72, optimize=True)
+            count += 1
+    except Exception:
+        traceback.print_exc()
+    return count
+
+
+def _attach_frames(job_id: str, data: dict) -> dict:
+    folder = _job_dir(job_id)
+    dest = folder / "frames"
+    count = len(list(dest.glob("*.jpg"))) if dest.is_dir() else 0
+    if count == 0:
+        count = save_step_frames(folder)
+    data["frames_url"] = f"/api/jobs/{job_id}/frames/{{index}}.jpg"
+    data["frame_count"] = count
+    return data
+
+
 @app.post("/api/jobs/{job_id}/analyze")
 def analyze(job_id: str, body: dict):
     missing = _missing(job_id)
@@ -307,6 +356,8 @@ def analyze(job_id: str, body: dict):
     if traces_path.exists():
         traces = json.loads(traces_path.read_text())
         traces["image_url"] = f"/api/jobs/{job_id}/frame0.png"
+        save_step_frames(folder)
+        _attach_frames(job_id, traces)
         traces_path.write_text(json.dumps(traces, indent=2))
     (folder / "settings.json").write_text(json.dumps(body))
     _write_meta(job_id, status="done", stage="done", message="Analysis finished")
@@ -328,7 +379,15 @@ def traces(job_id: str):
         return JSONResponse(status_code=404, content={"error": "not_ready", "message": "Run the analysis before opening the traces."})
     data = json.loads(path.read_text())
     data["image_url"] = f"/api/jobs/{job_id}/frame0.png"
-    return data
+    return _attach_frames(job_id, data)
+
+
+@app.get("/api/jobs/{job_id}/frames/{index}.jpg")
+def playback_frame(job_id: str, index: int):
+    path = _job_dir(job_id) / "frames" / f"{index}.jpg"
+    if not path.exists():
+        return JSONResponse(status_code=404, content={"error": "not_ready", "message": "That video frame is not ready yet."})
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/jobs/{job_id}/audio/{name}.wav")

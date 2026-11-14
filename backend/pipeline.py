@@ -35,15 +35,21 @@ def build_cluster_traces(
         int(c["cluster_id"]): c.get("color", "#6E9BFF")
         for c in summary_json.get("clusters", [])
     }
-    clusters = []
-    for cid, g in cluster_summary.sort_values("frame").groupby("cluster_id"):
-        pts = g[["centroid_x", "centroid_y"]].to_numpy(dtype=float)
-        if len(pts) > 50:
-            import numpy as np
+    import numpy as np
 
+    clusters = []
+    max_frame = 0
+    for cid, g in cluster_summary.sort_values("frame").groupby("cluster_id"):
+        rows = g.sort_values("frame")
+        frames = rows["frame"].to_numpy()
+        pts = rows[["centroid_x", "centroid_y"]].to_numpy(dtype=float)
+        if len(pts) > 50:
             picked = np.linspace(0, len(pts) - 1, 50).astype(int)
             pts = pts[picked]
-        path = [[_num(x), _num(y)] for x, y in pts]
+            frames = frames[picked]
+        path = [[_num(x), _num(y), int(frame)] for (x, y), frame in zip(pts, frames)]
+        if len(frames):
+            max_frame = max(max_frame, int(frames.max()))
         end = path[-1] if path else [0.0, 0.0]
         clusters.append(
             {
@@ -61,6 +67,7 @@ def build_cluster_traces(
         "poa": {"x": float(poa_x), "y": float(poa_y)},
         "max_radius": float(max_radius),
         "clusters": clusters,
+        "max_frame": int(max_frame),
         "description": (
             f"Fixed-radius chunk circles and centroid trails for {len(clusters)} chunks "
             f"from {n_cells} cells over {n_frames} frames. The Point of Audio is marked."

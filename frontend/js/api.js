@@ -84,6 +84,12 @@ function frameImageUrl(jobId) {
   return "/api/jobs/" + encodeURIComponent(jobId) + "/frame0.png";
 }
 
+function frameStepUrl(jobId, index, template) {
+  const number = String(index);
+  if (template) return String(template).replace("{index}", number);
+  return "/api/jobs/" + encodeURIComponent(jobId) + "/frames/" + encodeURIComponent(number) + ".jpg";
+}
+
 function audioUrl(jobId, name) {
   const file = String(name || "").replace(/\.wav$/, "");
   return "/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav";

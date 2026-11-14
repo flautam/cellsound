@@ -76,6 +76,11 @@
       <button type="button" class="btn btn-line" id="replay">Replay from start</button>
       <button type="button" class="btn btn-stop" id="stop">Stop all sound (Esc)</button>
     </div>
+    <fieldset class="hear-set" id="hear-set">
+      <legend>Clusters to hear</legend>
+      <div class="hear-boxes" id="hear-boxes"></div>
+    </fieldset>
+    <p class="hint" id="hear-note" role="status" aria-live="polite" aria-atomic="true">Cluster choices will appear when the summary loads.</p>
     <div class="cues" id="wave" aria-hidden="true">
       <div class="cue"><span>Pitch</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
       <div class="cue"><span>Volume</span><span class="cue-track"><i id="volume-fill"></i></span></div>

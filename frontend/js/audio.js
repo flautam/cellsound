@@ -167,6 +167,158 @@ function playRecording(url, options) {
   };
 }
 
+function playMix(urls, options) {
+  const settings = options || {};
+  stopAllSound(true);
+  const ctx = audioContext();
+  const master = ctx.createGain();
+  master.gain.value = 0.0001;
+  master.connect(ctx.destination);
+  let buffers = [];
+  let gains = [];
+  let sources = [];
+  let masks = (settings.heard || []).slice();
+  let rate = settings.rate || 1;
+  let offset = 0;
+  let startedAt = 0;
+  let alive = true;
+  let boost = 1;
+  let duration = 0;
+
+  function applyVolume() {
+    const now = ctx.currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(master.gain.value, now);
+    master.gain.linearRampToValueAtTime(Math.max(0.0001, appVolume * boost), now + 0.03);
+    let count = 0;
+    masks.forEach(function (on) { if (on) count += 1; });
+    const each = count ? 1 / Math.sqrt(count) : 0;
+    gains.forEach(function (gain, index) {
+      const level = masks[index] ? each : 0;
+      gain.gain.cancelScheduledValues(now);
+      if (!level) {
+        gain.gain.setValueAtTime(0, now);
+        return;
+      }
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(level, now + 0.02);
+    });
+  }
+
+  function begin(at) {
+    if (!buffers.length || !alive) return;
+    sources.forEach(function (source) {
+      source.onended = null;
+      try { source.stop(); } catch (error) { /* already stopped */ }
+    });
+    sources = [];
+    offset = Math.max(0, Math.min(Math.max(0, duration - 0.05), at || 0));
+    const when = ctx.currentTime;
+    let pending = 0;
+    buffers.forEach(function (buffer, index) {
+      if (!buffer || !gains[index] || offset >= buffer.duration - 0.02) return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = rate;
+      source.connect(gains[index]);
+      pending += 1;
+      source.onended = function () {
+        pending -= 1;
+        if (pending > 0 || !alive) return;
+        alive = false;
+        activeSounds.delete(stop);
+        if (settings.onEnded) settings.onEnded();
+      };
+      source.start(when, Math.min(offset, buffer.duration - 0.02));
+      sources.push(source);
+    });
+    if (!pending) {
+      alive = false;
+      activeSounds.delete(stop);
+      if (settings.onEnded) settings.onEnded();
+      return;
+    }
+    startedAt = when;
+  }
+
+  function stop() {
+    alive = false;
+    sources.forEach(function (source) {
+      source.onended = null;
+      try { source.stop(); } catch (error) { /* already stopped */ }
+    });
+  }
+
+  activeSounds.add(stop);
+  Promise.all((urls || []).map(function (url) {
+    return fetch(url).then(function (response) {
+      if (!response.ok) return null;
+      return response.arrayBuffer();
+    }).then(function (bytes) {
+      if (!bytes) return null;
+      return ctx.decodeAudioData(bytes).catch(function () { return null; });
+    }).catch(function () { return null; });
+  })).then(function (decoded) {
+    if (!alive) return;
+    buffers = decoded;
+    if (!buffers.some(Boolean)) {
+      if (settings.onError) settings.onError();
+      return;
+    }
+    if (settings.heard && settings.heard.length === buffers.length) {
+      masks = settings.heard.slice();
+    } else {
+      masks = buffers.map(function () { return true; });
+    }
+    duration = 0;
+    let peak = 0;
+    buffers.forEach(function (buffer) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(master);
+      gains.push(gain);
+      if (!buffer) return;
+      duration = Math.max(duration, buffer.duration);
+      const samples = buffer.getChannelData(0);
+      for (let i = 0; i < samples.length; i += 32) {
+        peak = Math.max(peak, Math.abs(samples[i]));
+      }
+    });
+    boost = peak > 0.01 ? Math.min(4, 0.85 / peak) : 1;
+    applyVolume();
+    begin((settings.ratio || 0) * duration);
+  });
+
+  return {
+    setVolume: applyVolume,
+    setRate: function (next) {
+      const now = ctx.currentTime;
+      const played = Math.max(0, (now - startedAt) * rate);
+      offset = duration ? Math.min(duration, offset + played) : offset + played;
+      startedAt = now;
+      rate = next || 1;
+      sources.forEach(function (source) { source.playbackRate.value = rate; });
+    },
+    setHeard: function (next) {
+      masks = (next || []).slice();
+      settings.heard = masks;
+      applyVolume();
+    },
+    seekRatio: function (next) {
+      if (!duration) return;
+      const place = Math.max(0, Math.min(0.999, next)) * duration;
+      if (alive) begin(place);
+      else offset = place;
+    },
+    ready: function () { return duration > 0; },
+    currentRatio: function () {
+      if (!duration) return 0;
+      const played = sources.length ? (ctx.currentTime - startedAt) * rate : 0;
+      return Math.min(1, (offset + Math.max(0, played)) / duration);
+    }
+  };
+}
+
 function playCue(kind) {
   const job = typeof currentJobId === "function" ? currentJobId() : "";
   if (!job) return;

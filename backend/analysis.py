@@ -44,7 +44,18 @@ DEMO_BAR15_PIXEL_SIZE_UM = 100.0 / 77.0
 DEMO_BAR15_MINUTES_PER_FRAME = (2.42 * 60.0) / 29.0
 
 COLORS = ["#6E9BFF", "#3FD1C9", "#B79BFF", "#F2A93B", "#FF7A6B", "#7BE0A6", "#FFD25E", "#C0C0C0"]
-INSTRUMENTS = ["piano", "marimba", "cello", "flute", "bell", "soft synth", "piano", "marimba"]
+INSTRUMENTS = [
+    "piano",
+    "marimba",
+    "cello",
+    "flute",
+    "bell",
+    "soft synth",
+    "guitar",
+    "trumpet",
+    "violin",
+    "choir",
+]
 
 
 def _num(value, places: int = 3):
