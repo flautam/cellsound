@@ -1,6 +1,5 @@
 /* Point of Audio: move a point with buttons or numbers, then run analysis. */
 const FILLS = ["var(--sun)", "var(--butter)", "var(--on-header)", "var(--primary)"];
-const INSTRUMENTS = ["piano", "marimba", "cello", "flute", "bell", "soft synth", "guitar", "trumpet", "violin", "choir"];
 
 const statusText = document.getElementById("status-text");
 const previewTitle = document.getElementById("preview-title");
@@ -125,15 +124,9 @@ function refreshSliders() {
 }
 
 function analysisBody() {
-  const count = Number(clusterSlider.value);
-  const instruments = {};
-  for (let index = 1; index <= count; index += 1) {
-    instruments[String(index)] = INSTRUMENTS[(index - 1) % INSTRUMENTS.length];
-  }
   return {
     poa: { x: poa.x, y: poa.y },
-    n_clusters: count,
-    instruments: instruments
+    n_clusters: Number(clusterSlider.value)
   };
 }
 

@@ -82,11 +82,10 @@
     </fieldset>
     <p class="hint" id="hear-note" role="status" aria-live="polite" aria-atomic="true">Cluster choices will appear when the summary loads.</p>
     <div class="cues" id="wave" aria-hidden="true">
-      <div class="cue"><span>Pitch</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
-      <div class="cue"><span>Volume</span><span class="cue-track"><i id="volume-fill"></i></span></div>
-      <div class="cue"><span>Beat</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
+      <div class="cue"><span>Tone</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
+      <div class="cue"><span>Pulses</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
     </div>
-    <p class="hint">The picture changes only when the video moves forward. Pitch shows direction, volume shows closeness, and the beat shows speed.</p>
+    <p class="hint">Each cluster keeps its own tone. Faster pulses mean that cluster is closer to the Point of Audio. Farther cells tap more slowly.</p>
     <div class="split">
       <div class="field" style="flex:2 1 18em">
         <label for="pos">Position in video</label>
@@ -111,7 +110,7 @@
     <div class="flow">
       <label class="check-label"><input type="checkbox" id="move-end" checked> When the sound ends, move to the description</label>
     </div>
-    <p class="hint">Left and right is part of the sound. A cell to the left of the Point of Audio plays in the left ear, and a cell to the right plays in the right ear.</p>
+    <p class="hint">Left and right is a small extra cue. A cell to the left of the Point of Audio plays a little toward the left ear, and a cell to the right plays a little toward the right ear. The tone stays the one for that cluster.</p>
     <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Ready. Press Play overview to start. Sound never plays on its own.</p>
   </section>
 
@@ -149,7 +148,7 @@
   <section class="accordion" id="help" aria-labelledby="how-h">
     <h2 id="how-h">
       <button type="button" class="accordion-btn" id="how-btn" aria-expanded="false" aria-controls="how-panel">
-        <span>How to listen<small>Pitch = direction · Volume = closeness · Beat = speed</small></span>
+        <span>How to listen<small>Each cluster has its own tone · Faster pulses mean closer to the Point of Audio</small></span>
         <span id="how-state">Show</span>
       </button>
     </h2>

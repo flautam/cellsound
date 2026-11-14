@@ -44,18 +44,6 @@ DEMO_BAR15_PIXEL_SIZE_UM = 100.0 / 77.0
 DEMO_BAR15_MINUTES_PER_FRAME = (2.42 * 60.0) / 29.0
 
 COLORS = ["#6E9BFF", "#3FD1C9", "#B79BFF", "#F2A93B", "#FF7A6B", "#7BE0A6", "#FFD25E", "#C0C0C0"]
-INSTRUMENTS = [
-    "piano",
-    "marimba",
-    "cello",
-    "flute",
-    "bell",
-    "soft synth",
-    "guitar",
-    "trumpet",
-    "violin",
-    "choir",
-]
 
 
 def _num(value, places: int = 3):
@@ -563,7 +551,7 @@ def analyze(
                 "along_trend_um_per_min": _num(row["along_trend_um_per_min"]),
                 "trend_contribution": _num(row["trend_contribution"]),
                 "cohesion_um": _num(row["cohesion_um"]),
-                "instrument": INSTRUMENTS[(cid - 1) % len(INSTRUMENTS)],
+                "instrument": f"Tone {int(cid)}",
                 "color": COLORS[(cid - 1) % len(COLORS)],
                 "audio": f"cluster_{cid}.wav",
                 "description": narration,
@@ -579,7 +567,7 @@ def analyze(
                 "n_cells": int(round(row["n_cells_mean"])),
                 "n_unique_cells": len(row["cell_ids"]),
                 "unusual": unusual,
-                "instrument": INSTRUMENTS[(cid - 1) % len(INSTRUMENTS)],
+                "instrument": f"Tone {int(cid)}",
                 "color": COLORS[(cid - 1) % len(COLORS)],
                 "mean_speed": _num(row["mean_speed_um_per_min"]),
                 "mean_vx": _num(row["mean_vx_um_per_min"]),

@@ -138,7 +138,6 @@ def build_analysis(tracks: pd.DataFrame, settings: dict, width: int, height: int
         population_speed = float(cells["speed"].mean())
         population_angular = float(cells["angular_v"].mean())
 
-    instruments = settings.get("instruments") or {}
     groups = []
     if not cells.empty:
         scored = []
@@ -161,7 +160,7 @@ def build_analysis(tracks: pd.DataFrame, settings: dict, width: int, height: int
                     "name": name,
                     "n_cells": int(len(group)),
                     "unusual": unusual,
-                    "instrument": str(instruments.get(str(cluster_id), instruments.get(cluster_id, "piano"))),
+                    "instrument": f"Tone {cluster_id}",
                     "color": COLORS[(cluster_id - 1) % len(COLORS)],
                     "mean_speed": shown_speed,
                     "mean_radial_v": speed_of(mean_radial),

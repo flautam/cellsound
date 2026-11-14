@@ -181,14 +181,6 @@ def run_job_analysis(
         width_px=float(width),
         height_px=float(height),
     )
-    # Optional instrument overrides from the setup form.
-    instruments = settings.get("instruments") or {}
-    for cluster in summary.get("clusters", []):
-        cid = cluster["cluster_id"]
-        override = instruments.get(str(cid), instruments.get(cid))
-        if override:
-            cluster["instrument"] = str(override)
-
     analysis_df.to_csv(folder / "cluster_analysis.csv", index=False)
     timeseries.to_csv(folder / "cluster_timeseries.csv", index=False)
     (folder / "summary.json").write_text(json.dumps(summary, indent=2))

@@ -1,9 +1,8 @@
 /* Overview: play the population sound, show traces, and read the summary. */
 const CARDS = [
-  { id: "pitch", title: "Pitch = direction", text: "A higher note means cells are moving toward the Point of Audio. A lower note means they are moving away. A still cell stays on the middle note.", example: "Hear pitch example", cue: "pitch", status: "Example: a tone rising as a cell moves toward the Point of Audio, then falling as it moves away." },
-  { id: "volume", title: "Volume = closeness", text: "The closest cells are loudest. Middle cells are quieter. The farthest cells are soft, and their high notes drop away.", example: "Hear volume example", cue: "volume", status: "Example: a tone starting soft, then getting louder as the cell comes close." },
-  { id: "beat", title: "Beat = speed", text: "A slow beat means a cell is barely moving. Faster cells tap more often.", example: "Hear beat example", cue: "beat", status: "Example: a slow pulse speeding up to a quick beat." },
-  { id: "all", title: "All three together", text: "A fast cell moving toward a nearby Point of Audio sounds loud, high, and quick. Each cluster has its own instrument, so one group can be followed inside the mix.", example: "Hear them together", cue: "all", status: "Example: all three cues at once. A close, fast cell moving inward sounds loud, high, and quick.", wide: true, ink: true }
+  { id: "tone", title: "Each cluster has its own tone", text: "Cluster 1 is the lowest tone and higher cluster numbers sit higher, up to cluster 10. The note stays recognizable, so you can tell clusters apart immediately.", example: "Hear three tones", cue: "tone", status: "Example: three cluster tones in a row, each tapping slowly." },
+  { id: "pulse", title: "Faster pulses mean closer", text: "Pulse rate shows closeness to the Point of Audio. Cells near the point tap quickly. Cells far from it tap slowly. The base tone does not change to another cluster's note.", example: "Hear pulses speed up", cue: "pulse", status: "Example: one tone, tapping slowly at first, then faster as the cell comes closer." },
+  { id: "all", title: "Checked clusters together", text: "Overview plays each checked cluster on its own tone at the same time. A fast pulse is the cluster nearer the Point of Audio.", example: "Hear them together", cue: "all", status: "Example: two tones at once. The higher one pulses faster because it is closer.", wide: true, ink: true }
 ];
 
 const playButton = document.getElementById("play");
@@ -14,7 +13,6 @@ const volume = document.getElementById("vol");
 const volumeHint = document.getElementById("vol-hint");
 const statusText = document.getElementById("status-text");
 const pitchFill = document.getElementById("pitch-fill");
-const volumeFill = document.getElementById("volume-fill");
 const beatDots = document.querySelectorAll("#beat-dots i");
 const moveEnd = document.getElementById("move-end");
 const rate = document.getElementById("rate");
@@ -61,21 +59,12 @@ function showPosition() {
 function paintCues(preview) {
   const mix = totalFrames ? frame / totalFrames : 0;
   const closeness = 0.5 + 0.5 * Math.cos(mix * Math.PI);
-  let pitch = 0.12 + mix * 0.88;
-  let loud = (Number(volume.value) / 100) * (0.3 + 0.7 * closeness);
-  let beat = Math.min(beatDots.length - 1, Math.floor(mix * beatDots.length));
-  if (preview === "pitch") pitch = 0.92;
-  if (preview === "volume") loud = 0.92;
-  if (preview === "beat") beat = beatDots.length - 1;
-  if (preview === "all") {
-    pitch = 0.84;
-    loud = 0.88;
-    beat = beatDots.length - 2;
-  }
-  pitchFill.style.transform = "scaleX(" + pitch.toFixed(3) + ")";
-  volumeFill.style.transform = "scaleX(" + Math.max(0.08, loud).toFixed(3) + ")";
+  let beat = Math.min(beatDots.length - 1, Math.round(closeness * (beatDots.length - 1)));
+  if (preview === "tone") beat = 1;
+  if (preview === "pulse" || preview === "all") beat = beatDots.length - 1;
+  if (pitchFill) pitchFill.style.transform = "scaleX(0.62)";
   beatDots.forEach(function (dot, index) {
-    dot.classList.toggle("on", index === beat);
+    dot.classList.toggle("on", index <= beat);
   });
 }
 
@@ -168,7 +157,7 @@ function buildHearBoxes() {
     input.id = "hear-" + id;
     input.checked = heard[id];
     const text = document.createElement("span");
-    text.textContent = "Cluster " + id + ", " + cluster.name + ", " + (cluster.instrument || "piano");
+    text.textContent = "Cluster " + id + ", " + cluster.name + ", Tone " + id;
     input.addEventListener("change", function () {
       heard[id] = input.checked;
       syncHeard();
@@ -420,7 +409,7 @@ function buildCards() {
   CARDS.forEach(function (card) {
     const box = document.createElement("div");
     box.className = "listen-card" + (card.wide ? " wide" : "") + (card.ink ? " ink-card" : "");
-    if (!card.ink) box.style.background = card.id === "pitch" ? "var(--sky)" : card.id === "volume" ? "var(--mint)" : "var(--peach)";
+    if (!card.ink) box.style.background = card.id === "tone" ? "var(--sky)" : "var(--mint)";
     const title = document.createElement("h3");
     title.textContent = card.title;
     const copy = document.createElement("p");

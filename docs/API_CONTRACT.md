@@ -55,13 +55,12 @@ The frontend counts "cells within 50 pixels" itself from `cells`.
 {
   "poa": { "x": 256, "y": 256 },
   "n_clusters": 5,
-  "position_weight": 0.5,
-  "instruments": { "1": "piano", "2": "marimba", "3": "cello", "4": "flute", "5": "bell" }
+  "position_weight": 0.5
 }
 ```
-The server reads `poa`, `n_clusters` (default 5), `position_weight` (default 0.5), and `instruments`. `position_weight`: 0 = velocity only, 1 = position only.
+The server reads `poa`, `n_clusters` (default 5), and `position_weight` (default 0.5). `position_weight`: 0 = velocity only, 1 = position only.
 
-Pitch, volume, and the beat are fixed. Pitch follows radial velocity (higher when cells move toward the Point of Audio). Volume follows closeness. The beat follows speed. The body does not include `pitch_mode`, `volume_levels`, or `reverse_volume`.
+Each cluster keeps one fixed tone, from about 220 Hz for cluster 1 through 880 Hz for cluster 10. Pulse rate follows closeness to the Point of Audio (faster when cells are nearer). A small pitch bend can hint at direction. The body does not include `instruments`, `pitch_mode`, `volume_levels`, or `reverse_volume`.
 
 Response: `{ "status": "done" }`.
 
@@ -79,7 +78,7 @@ Response: `{ "status": "done" }`.
   "clusters": [
     {
       "cluster_id": 1, "rank": 1, "name": "Steady inward drifters", "n_cells": 48,
-      "unusual": false, "instrument": "piano", "color": "#6E9BFF",
+      "unusual": false, "instrument": "Tone 1", "color": "#6E9BFF",
       "mean_speed": 1.3, "mean_radial_v": -0.8, "mean_angular_v": 0.15,
       "description": "The most typical group. These cells move steadily toward the Point of Audio...",
       "audio": "cluster_1.wav", "cell_ids": [12, 27, 31]

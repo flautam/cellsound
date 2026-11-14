@@ -30,7 +30,7 @@ cluster_timeseries.csv: per-frame cluster velocities
 summary.json:        overview (video summary from chunks) + ranked chunk descriptions
 clusters_overlay.mp4: chunk circles on tracked frames
 Sounds:              overview.wav, cluster_1.wav, ...
-Instrument notes:    backend/samples/ (FluidR3_GM by Frank Wen, CC BY 3.0; see backend/samples/LICENSE.txt)
+Tones:               ten fixed pitches, about 220 Hz through 880 Hz. Faster pulses mean closer to the Point of Audio.
 
 Conventions: POA defaults to image center (`--poa X Y` to override).
 radial_v negative = toward POA. No angular velocity.

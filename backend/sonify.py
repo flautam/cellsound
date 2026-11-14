@@ -1,11 +1,11 @@
 """Write the wav files the Play buttons and the download zip share.
 
-Pitch follows direction (higher when cells move toward the Point of Audio).
-Volume follows closeness. A beat follows speed. Left and right follow
-which side of the Point of Audio the cells are on.
-
-Each instrument is a real FluidR3_GM note (Frank Wen, CC BY 3.0),
-pitch-shifted to the motion. See backend/samples/LICENSE.txt.
+Each cluster keeps one fixed tone, like a hearing test. Cluster 1 is
+220 Hz and cluster 10 is 880 Hz. Pulse rate follows closeness to the
+Point of Audio: closer cells tap faster. A slight pitch bend can hint
+at direction, but it stays small enough that the cluster tone is still
+obvious. Tones are synthesized here (soft triangle), not loaded from
+a sample library.
 """
 
 from __future__ import annotations
@@ -17,36 +17,47 @@ import pandas as pd
 import soundfile as sf
 
 RATE = 22050
-SAMPLES = Path(__file__).resolve().parent / "samples"
 
-# Octave shifts keep the same motion in a register that suits the instrument.
-# strike=True keeps the hammer/pluck; False lets the note ring.
-VOICES = {
-    "piano": {"sample": "piano", "octave": 1.0, "strike": True},
-    "marimba": {"sample": "marimba", "octave": 1.0, "strike": True},
-    "cello": {"sample": "cello", "octave": 0.5, "strike": False},
-    "flute": {"sample": "flute", "octave": 1.7, "strike": False},
-    "bell": {"sample": "bell", "octave": 1.45, "strike": True},
-    "soft synth": {"sample": "soft_synth", "octave": 1.0, "strike": False},
-    "guitar": {"sample": "guitar", "octave": 0.85, "strike": True},
-    "trumpet": {"sample": "trumpet", "octave": 1.15, "strike": False},
-    "violin": {"sample": "violin", "octave": 1.55, "strike": False},
-    "choir": {"sample": "choir", "octave": 0.9, "strike": False},
-}
-
-# Recorded pitch of each one-shot, so we pick the closest note before shifting.
-NOTES = (
-    ("C3", 130.8128),
-    ("C4", 261.6256),
-    ("C5", 523.2511),
-    ("C6", 1046.5023),
+# One comfortable pitch per cluster number. Steps are about a minor third,
+# so neighbors stay easy to tell apart and nothing sits in a squeal or a rumble.
+CLUSTER_HZ = (
+    220.0,
+    256.0,
+    299.0,
+    349.0,
+    407.0,
+    475.0,
+    554.0,
+    647.0,
+    754.0,
+    880.0,
 )
 
-_LOADED = {}
+# Far cells tap about once a second. Cells on the Point of Audio tap faster.
+PULSE_FAR = 1.15
+PULSE_NEAR = 5.6
+# Direction may nudge the pitch by this fraction at most.
+BEND = 0.025
 
 
-def _voice(name):
-    return VOICES.get(str(name or "piano").lower(), VOICES["piano"])
+def tone_hz(cluster_id) -> float:
+    try:
+        index = int(cluster_id) - 1
+    except (TypeError, ValueError):
+        index = 0
+    if index < 0:
+        index = 0
+    return float(CLUSTER_HZ[index % len(CLUSTER_HZ)])
+
+
+def tone_name(cluster_id) -> str:
+    try:
+        number = int(cluster_id)
+    except (TypeError, ValueError):
+        number = 1
+    if number < 1:
+        number = 1
+    return f"Tone {((number - 1) % len(CLUSTER_HZ)) + 1}"
 
 
 def _columns(motion: pd.DataFrame, cell_ids):
@@ -81,153 +92,118 @@ def _stretch(values, count):
     return np.interp(np.linspace(0, 1, count), source, clean)
 
 
-def _level(wave, peak=0.85):
+def _level(wave, peak=0.8):
     loudest = float(np.max(np.abs(wave)) or 1.0)
     return (wave / loudest * peak).astype(np.float32)
 
 
-def _load_note(folder, note):
-    key = (folder, note)
-    if key not in _LOADED:
-        path = SAMPLES / folder / f"{note}.wav"
-        data, rate = sf.read(path, always_2d=False)
-        if np.asarray(data).ndim > 1:
-            data = np.asarray(data).mean(axis=1)
-        data = np.asarray(data, dtype=np.float32)
-        if int(rate) != RATE:
-            length = max(1, int(len(data) * RATE / float(rate)))
-            data = np.interp(np.linspace(0, len(data) - 1, length), np.arange(len(data)), data).astype(np.float32)
-        _LOADED[key] = data
-    return _LOADED[key]
+def _soft_triangle(freq):
+    phase = np.cumsum(np.asarray(freq, dtype=float)) / RATE
+    # A triangle's extra harmonic is quiet, so the tone stays soft.
+    wave = np.sin(2 * np.pi * phase)
+    wave += 0.16 * np.sin(6 * np.pi * phase)
+    return wave.astype(np.float32)
 
 
-def _closest_note(target_hz):
-    target = max(float(target_hz), 1.0)
-    best = NOTES[1]
-    best_gap = 1e9
-    for note in NOTES:
-        gap = abs(np.log(target / note[1]))
-        if gap < best_gap:
-            best = note
-            best_gap = gap
-    return best
+def _pulse_envelope(pulse_hz):
+    pulse = np.clip(np.asarray(pulse_hz, dtype=float), 0.7, 6.5)
+    phase = np.cumsum(pulse) / RATE
+    local = phase - np.floor(phase)
+    into = local / np.maximum(pulse, 0.7)
+    attack = np.clip(into / 0.014, 0.0, 1.0)
+    body = np.exp(-into / 0.085)
+    return (attack * body).astype(np.float32)
 
 
-def _shift(sample, source_hz, target_hz):
-    ratio = float(target_hz) / float(source_hz)
-    if ratio <= 0:
-        return sample
-    length = max(1, int(len(sample) / ratio))
-    positions = np.linspace(0, len(sample) - 1, length)
-    return np.interp(positions, np.arange(len(sample)), sample).astype(np.float32)
-
-
-def _fade_edges(sample):
-    faded = np.array(sample, dtype=np.float32, copy=True)
-    edge = min(int(RATE * 0.008), max(0, len(faded) // 4))
+def _render(freq, amp, pulse_hz, pan):
+    count = len(freq)
+    wave = _soft_triangle(freq) * _pulse_envelope(pulse_hz) * np.asarray(amp, dtype=np.float32)
+    side = np.clip(np.asarray(pan, dtype=float), -1.0, 1.0)
+    left = np.sqrt(np.clip((1 - side) / 2, 0, 1)).astype(np.float32)
+    right = np.sqrt(np.clip((1 + side) / 2, 0, 1)).astype(np.float32)
+    stereo = np.column_stack((wave * left, wave * right))
+    edge = min(int(RATE * 0.012), max(0, count // 4))
     if edge > 1:
         ramp = np.linspace(0, 1, edge, dtype=np.float32)
-        faded[:edge] *= ramp
-        faded[-edge:] *= ramp[::-1]
-    return faded
-
-
-def _place_note(sample, target_hz, strike):
-    note, source_hz = _closest_note(target_hz)
-    shifted = _shift(sample, source_hz, target_hz)
-    cap = int(RATE * (0.7 if strike else 1.6))
-    return _fade_edges(shifted[:cap])
-
-
-def _render(freq, amp, pulse_hz, pan, voice):
-    count = len(freq)
-    stereo = np.zeros((count, 2), dtype=np.float32)
-    played = np.clip(np.asarray(freq, dtype=float) * float(voice["octave"]), 70.0, 1600.0)
-    phase = np.cumsum(np.maximum(pulse_hz, 0.05)) / RATE
-    hits = np.flatnonzero(np.diff(np.floor(phase), prepend=-1) > 0)
-    folder = voice["sample"]
-    cache = {}
-    for hit in hits:
-        target = float(played[hit])
-        note, _source = _closest_note(target)
-        if note not in cache:
-            cache[note] = _load_note(folder, note)
-        note_wave = _place_note(cache[note], target, voice["strike"])
-        end = min(count, hit + len(note_wave))
-        length = end - hit
-        if length <= 0:
-            continue
-        level = float(amp[hit])
-        side = float(pan[hit])
-        left = np.sqrt(np.clip((1 - side) / 2, 0, 1))
-        right = np.sqrt(np.clip((1 + side) / 2, 0, 1))
-        stereo[hit:end, 0] += note_wave[:length] * level * left
-        stereo[hit:end, 1] += note_wave[:length] * level * right
+        stereo[:edge] *= ramp[:, None]
+        stereo[-edge:] *= ramp[::-1, None]
     return _level(stereo)
 
 
-def _from_motion(radial, speed, dist, xs, poa_x, span, voice, seconds, pan_bias=0.0):
+def _from_motion(base_hz, radial, dist, xs, poa_x, span, seconds, pan_bias=0.0):
     count = max(1, int(RATE * seconds))
-    base = np.clip(392.0 * np.exp(np.clip(-_stretch(radial, count), -3, 3) * 0.28), 160, 900)
+    # Negative radial velocity means toward the Point of Audio.
+    nudge = np.tanh(_stretch(radial, count) / 12.0) * BEND
+    freq = float(base_hz) * (1.0 - nudge)
     closeness = 1.0 - np.clip(_stretch(dist, count) / max(span, 1.0), 0, 1)
-    amp = 0.28 + 0.72 * closeness
-    pulse = np.clip(0.8 + np.clip(_stretch(speed, count), 0, 8) * 0.9, 0.6, 7)
-    pan = np.clip((_stretch(xs, count) - poa_x) / max(span, 1.0) + pan_bias, -1, 1)
-    return _render(base, amp, pulse, pan, voice)
+    pulse = PULSE_FAR + (PULSE_NEAR - PULSE_FAR) * closeness
+    amp = 0.72 + 0.28 * closeness
+    pan = np.clip(((_stretch(xs, count) - poa_x) / max(span, 1.0)) * 0.7 + pan_bias, -1, 1)
+    return _render(freq, amp, pulse, pan)
 
 
-def _curve(freq, amp, pulse, pan, voice):
+def _curve(freq, amp, pulse, pan):
     return _render(
         np.asarray(freq, dtype=float),
         np.asarray(amp, dtype=float),
         np.asarray(pulse, dtype=float),
         np.asarray(pan, dtype=float),
-        voice,
     )
 
 
 def _examples():
     count = int(RATE * 3)
     line = np.linspace(0, 1, count)
-    up_down = np.sin(np.pi * line)
-    pitch = _curve(280 + 380 * up_down, np.full(count, 0.55), np.full(count, 1.5), np.zeros(count), _voice("flute"))
-    volume = _curve(np.full(count, 440.0), 0.2 + 0.8 * line, np.full(count, 1.5), np.zeros(count), _voice("piano"))
-    beat = _curve(np.full(count, 240.0), np.full(count, 0.6), 1 + 6 * line, np.zeros(count), _voice("marimba"))
-    together = _curve(
-        300 + 280 * line,
-        0.25 + 0.7 * line,
-        1.2 + 4 * line,
-        np.linspace(-0.6, 0.6, count),
-        _voice("piano"),
+    # Three cluster tones in a row, each tapping slowly so the pitch is clear.
+    tones = np.piecewise(
+        line,
+        [line < 1 / 3, (line >= 1 / 3) & (line < 2 / 3), line >= 2 / 3],
+        [CLUSTER_HZ[0], CLUSTER_HZ[4], CLUSTER_HZ[7]],
     )
+    tone = _curve(tones, np.full(count, 0.8), np.full(count, 1.6), np.zeros(count))
+    # Same tone, pulses speeding up as a cell approaches the Point of Audio.
+    pulse = _curve(
+        np.full(count, CLUSTER_HZ[4]),
+        np.full(count, 0.8),
+        PULSE_FAR + (PULSE_NEAR - PULSE_FAR) * line,
+        np.zeros(count),
+    )
+    # Two clusters at once: one far and slow, one close and fast.
+    far = _curve(np.full(count, CLUSTER_HZ[1]), np.full(count, 0.75), np.full(count, PULSE_FAR), np.full(count, -0.35))
+    near = _curve(np.full(count, CLUSTER_HZ[6]), np.full(count, 0.75), np.full(count, PULSE_NEAR), np.full(count, 0.35))
+    together = _level(far * 0.7 + near * 0.7)
     return {
-        "example_pitch.wav": pitch,
-        "example_volume.wav": volume,
-        "example_beat.wav": beat,
+        "example_tone.wav": tone,
+        "example_pulse.wav": pulse,
         "example_all.wav": together,
+        # Older button names, same demonstrations, so a stale page still plays a tone.
+        "example_pitch.wav": tone,
+        "example_volume.wav": pulse,
+        "example_beat.wav": pulse,
     }
 
 
 def write_sounds(folder: Path, motion: pd.DataFrame, summary: dict, poa_x: float, poa_y: float, width: int, height: int) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     span = max(float(width), float(height), 1.0) / 2
-    radial, _speed, _dist, _xs = _columns(motion, None)
+    radial, _speed, dist, xs = _columns(motion, None)
     seconds = max(3.0, len(radial) * 0.5)
     layers = []
-    places = (-0.5, 0.5, -0.32, 0.32, -0.16, 0.16, -0.42, 0.42, 0.0, 0.22)
+    places = (-0.45, 0.45, -0.28, 0.28, -0.12, 0.12, -0.36, 0.36, 0.0, 0.18)
     for index, cluster in enumerate(summary.get("clusters", [])):
-        voice = _voice(cluster.get("instrument"))
-        cr, cs, cd, cx = _columns(motion, cluster.get("cell_ids"))
-        wave = _from_motion(cr, cs, cd, cx, poa_x, span, voice, seconds)
-        name = cluster.get("audio") or f"cluster_{cluster.get('cluster_id', index + 1)}.wav"
+        cluster_id = cluster.get("cluster_id", index + 1)
+        base = tone_hz(cluster_id)
+        cr, _cs, cd, cx = _columns(motion, cluster.get("cell_ids"))
+        wave = _from_motion(base, cr, cd, cx, poa_x, span, seconds)
+        name = cluster.get("audio") or f"cluster_{cluster_id}.wav"
         sf.write(folder / name, wave, RATE)
-        layer = _from_motion(cr, cs, cd, cx, poa_x, span, voice, seconds, places[index % len(places)])
+        layer = _from_motion(base, cr, cd, cx, poa_x, span, seconds, places[index % len(places)])
         loudness = float(np.sqrt(np.mean(layer ** 2)) or 1.0)
-        layers.append(layer * (0.12 / loudness))
+        layers.append(layer * (0.16 / loudness))
     if layers:
         overview = _level(np.sum(layers, axis=0))
     else:
-        overview = _from_motion(radial, _speed, _dist, _xs, poa_x, span, _voice("piano"), seconds)
+        overview = _from_motion(CLUSTER_HZ[0], radial, dist, xs, poa_x, span, seconds)
     sf.write(folder / "overview.wav", overview, RATE)
     for name, wave in _examples().items():
         sf.write(folder / name, wave, RATE)

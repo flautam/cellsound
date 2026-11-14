@@ -2,7 +2,7 @@
 const picks = document.getElementById("cluster-picks");
 const statusText = document.getElementById("status");
 const keysOn = document.getElementById("keys-on");
-const instrumentSelect = document.getElementById("inst");
+const toneNote = document.getElementById("tone-note");
 const playButton = document.getElementById("play");
 const playLabel = document.getElementById("play-label");
 const playIcon = document.getElementById("play-icon");
@@ -12,7 +12,6 @@ let clusters = [];
 let current = 0;
 let playing = false;
 let tone = null;
-const chosenInstrument = {};
 
 function say(text) {
   if (statusText.textContent !== text) statusText.textContent = text;
@@ -30,13 +29,8 @@ function signed(value, places) {
   return "0";
 }
 
-function instrumentOf(cluster) {
-  return chosenInstrument[cluster.cluster_id] || String(cluster.instrument || "piano").toLowerCase();
-}
-
-function instrumentName(value) {
-  const option = instrumentSelect.querySelector("option[value=\"" + value + "\"]");
-  return option ? option.textContent : value;
+function toneLabel(cluster) {
+  return "Tone " + cluster.cluster_id;
 }
 
 function selected() {
@@ -64,7 +58,7 @@ function fillPick(cluster) {
   const selectedNow = cluster === selected();
   name.textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
   const meta = document.createElement("span");
-  meta.textContent = "~" + cluster.n_cells + " cells · " + instrumentName(instrumentOf(cluster)) + (selectedNow ? " · selected" : "");
+  meta.textContent = "~" + cluster.n_cells + " cells · " + toneLabel(cluster) + (selectedNow ? " · selected" : "");
   text.appendChild(name);
   text.appendChild(meta);
   if (cluster.unusual) {
@@ -100,7 +94,9 @@ function showDetail() {
     path.textContent = (cluster.start_region || "?") + " → " + (cluster.end_region || "?");
     path.colSpan = 2;
   }
-  instrumentSelect.value = instrumentOf(cluster);
+  if (toneNote) {
+    toneNote.textContent = toneLabel(cluster) + " is this cluster's note. Faster pulses mean those cells are closer to the Point of Audio.";
+  }
   document.getElementById("prev").disabled = current === 0;
   document.getElementById("next").disabled = current === clusters.length - 1;
   const explore = document.getElementById("explore");
@@ -116,7 +112,7 @@ function select(index, focusId) {
   current = next;
   showDetail();
   const cluster = selected();
-  say("Cluster " + cluster.cluster_id + ", " + cluster.name + ", selected. " + cluster.n_cells + " cells, played on " + instrumentName(instrumentOf(cluster)).toLowerCase() + ".");
+  say("Cluster " + cluster.cluster_id + ", " + cluster.name + ", selected. " + cluster.n_cells + " cells, " + toneLabel(cluster) + ".");
   if (focusId) {
     const target = document.getElementById(focusId);
     if (target) target.focus();
@@ -194,14 +190,6 @@ document.getElementById("stop").addEventListener("click", function () {
 
 document.getElementById("prev").addEventListener("click", function () { move(-1); });
 document.getElementById("next").addEventListener("click", function () { move(1); });
-
-instrumentSelect.addEventListener("change", function () {
-  const cluster = selected();
-  if (!cluster) return;
-  chosenInstrument[cluster.cluster_id] = instrumentSelect.value;
-  fillPick(cluster);
-  say("The saved recording still uses " + instrumentName(cluster.instrument || "piano").toLowerCase() + ". Run the analysis again to record this cluster on " + instrumentName(instrumentSelect.value).toLowerCase() + ".");
-});
 
 keysOn.addEventListener("change", function () {
   say(keysOn.checked ? "N and P shortcuts turned on." : "N and P shortcuts turned off.");
