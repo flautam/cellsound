@@ -15,6 +15,7 @@ Interpolated gap-bridge positions are flagged and excluded from observed counts.
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import sys
 import time
@@ -34,7 +35,6 @@ from trackastra.tracking.utils import graph_to_napari_tracks
 # backend/ on path when run as python backend/overnight_optimize.py
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from track import center_crop  # noqa: E402
-from video import load_video  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -44,11 +44,15 @@ STATE = OUT / "state.json"
 RESULTS = OUT / "results.csv"
 REPORT = OUT / "MORNING_REPORT.md"
 
-CLIP_FRAMES = 30
+CLIP_FRAMES = 30  # short clips for detect/link tuning only
 CLIP_CROP = 256
-FINAL_FRAMES = 60
+# Baseline + finalists use every frame (None). Legacy FINAL_FRAMES kept for keying docs only.
+FINAL_FRAMES = None
 LONG_FRAC = 0.50
 TARGET_FRAC = 0.75
+
+# Single-video overnight: future batches stay on bar15 unless --video overrides.
+DEFAULT_VIDEOS = ["bar15_01_20260206_bar025.20k.00.mp4"]
 
 
 def log(msg: str) -> None:
@@ -58,6 +62,12 @@ def log(msg: str) -> None:
     with LOG.open("a") as f:
         f.write(line + "\n")
 
+
+def free_mem(tag: str = "") -> None:
+    """Drop transient arrays between experiments (helps 8GB boxes)."""
+    gc.collect()
+    if tag:
+        log(f"gc {tag}")
 
 def load_state() -> dict:
     if STATE.exists():
@@ -88,32 +98,89 @@ def append_result(row: dict) -> None:
         df.to_csv(RESULTS, index=False)
 
 
-def video_paths() -> list[Path]:
+def video_paths(only: list[str] | None = None) -> list[Path]:
     paths = sorted(DATA.glob("*.mp4"))
+    if only:
+        wanted = {Path(name).name for name in only}
+        paths = [p for p in paths if p.name in wanted]
+        missing = wanted - {p.name for p in paths}
+        if missing:
+            raise FileNotFoundError(f"Requested videos not in {DATA}: {sorted(missing)}")
     if len(paths) < 1:
         raise FileNotFoundError(f"No MP4s in {DATA}")
     return paths
 
 
-def prep_video(path: Path, frames: int, crop: int) -> tuple[np.ndarray, dict]:
-    raw = load_video(path)
+def count_timepoints(path: Path) -> int:
+    """Count frames in an MP4 (time = frame index). Not used for TIFF stacks here."""
+    import imageio.v3 as iio
+
+    return sum(1 for _ in iio.imiter(path))
+
+
+def frame_range_tag(frame0: int, n_selected: int, source_n: int) -> str:
+    """Stable resume-key fragment: video identity is separate; this is the frame window."""
+    last = frame0 + n_selected - 1
+    kind = "full" if n_selected >= source_n else "clip"
+    return f"{kind}_f{frame0}-{last}_n{n_selected}_of{source_n}"
+
+
+def exp_key(phase: str, path: Path, frame_tag: str, *parts: object) -> str:
+    bits = [phase, path.name, frame_tag, *[str(p) for p in parts]]
+    return "::".join(bits)
+
+
+def prep_video(
+    path: Path, frames: int | None, crop: int
+) -> tuple[np.ndarray, dict]:
+    """Load MP4 frames (axis0 = time), optional first-N clip, center crop.
+
+    frames=None means every time point. Crops while streaming to limit RAM.
+    """
+    import imageio.v3 as iio
+
+    source_n = count_timepoints(path)
+    selected_n = source_n if frames is None else min(int(frames), source_n)
+    frame0 = 0
+    tag = frame_range_tag(frame0, selected_n, source_n)
+    log(
+        f"prep {path.name}: source_timepoints={source_n} selected={selected_n} "
+        f"range=[{frame0},{frame0 + selected_n}) tag={tag} "
+        f"(MP4; time axis = frame index 0)"
+    )
+
+    collected: list[np.ndarray] = []
+    for i, frame in enumerate(iio.imiter(path)):
+        if i >= selected_n:
+            break
+        arr = np.asarray(frame)
+        if arr.ndim == 3 and arr.shape[-1] in (3, 4):
+            arr = arr[..., :3].astype(np.float32).mean(axis=-1)
+        else:
+            arr = arr.astype(np.float32)
+        collected.append(arr)
+    raw = np.stack(collected)
+    video = center_crop(raw, crop).astype(np.float32)
     meta = {
         "path": str(path),
         "name": path.name,
-        "full_frames": int(raw.shape[0]),
+        "source_timepoints": source_n,
+        "selected_frames": selected_n,
+        "frame0": frame0,
+        "frame_last": frame0 + selected_n - 1,
+        "frame_tag": tag,
+        "full_frames": selected_n,
         "full_height": int(raw.shape[1]),
         "full_width": int(raw.shape[2]),
-        "dtype": str(raw.dtype),
-        "min": float(np.min(raw)),
-        "max": float(np.max(raw)),
-        "frame_interval": None,  # unknown for these MP4s
+        "dtype": str(video.dtype),
+        "min": float(np.min(video)),
+        "max": float(np.max(video)),
+        "frame_interval": None,
         "clip_frames": frames,
         "clip_crop": crop,
+        "used_shape": list(video.shape),
     }
-    video = raw[:frames]
-    video = center_crop(video, crop)
-    meta["used_shape"] = list(video.shape)
-    return video.astype(np.float32), meta
+    return video, meta
 
 
 def normalize_frame(frame: np.ndarray) -> np.ndarray:
@@ -151,16 +218,41 @@ def segment(
     diameter: float | None,
     cellprob_threshold: float,
     flow_threshold: float,
+    source_timepoints: int | None = None,
+    frame0: int = 0,
 ) -> np.ndarray:
+    """Segment one frame at a time.
+
+    Cellpose's tqdm ``0/N`` is N = len(selected frames) for this call — one
+    increment = one time point of the *selected* clip/window, not a batch and
+    not necessarily the full source movie. We also log overall
+    ``processed/selected (source_timepoints=…)``.
+    """
     model = models.CellposeModel(gpu=False)
-    frames = [frame for frame in video]
+    n = int(video.shape[0])
+    src = source_timepoints if source_timepoints is not None else n
+    log(
+        f"cellpose: selected={n} source_timepoints={src} "
+        f"window=[{frame0},{frame0 + n}); progress-bar 0/{n} means "
+        f"1 increment = 1 selected frame (not batch size)"
+    )
     kwargs = {
         "diameter": diameter,
         "cellprob_threshold": cellprob_threshold,
         "flow_threshold": flow_threshold,
+        "batch_size": 1,
     }
-    masks, _flows, _styles = model.eval(frames, **kwargs)
-    return np.stack(masks).astype(np.int32)
+    masks = np.empty(video.shape, dtype=np.int32)
+    for i in range(n):
+        mask, _flows, _styles = model.eval(video[i], **kwargs)
+        masks[i] = mask
+        if (i + 1) % 5 == 0 or i + 1 == n:
+            log(
+                f"detect progress {i + 1}/{n} selected "
+                f"(source video {src} time points; frames "
+                f"[{frame0},{frame0 + n}) of file)"
+            )
+    return masks
 
 
 def masks_to_detections(masks: np.ndarray) -> list[pd.DataFrame]:
@@ -483,6 +575,7 @@ def run_pipeline(
     link: LinkCfg,
     cache_dir: Path | None = None,
     cache_key: str | None = None,
+    meta: dict | None = None,
 ) -> tuple[pd.DataFrame, np.ndarray, float]:
     t0 = time.time()
     masks = None
@@ -492,11 +585,15 @@ def run_pipeline(
             masks = np.load(mask_path)["masks"]
     if masks is None:
         proc = preprocess(video, detect.preprocess)
+        src_n = (meta or {}).get("source_timepoints")
+        f0 = int((meta or {}).get("frame0", 0))
         masks = segment(
             proc,
             detect.diameter,
             detect.cellprob_threshold,
             detect.flow_threshold,
+            source_timepoints=src_n,
+            frame0=f0,
         )
         if cache_dir and cache_key:
             cache_dir.mkdir(parents=True, exist_ok=True)
@@ -514,30 +611,39 @@ def run_pipeline(
 
 
 def phase_baseline(state: dict, paths: list[Path]) -> None:
-    log("=== PHASE baseline ===")
+    log("=== PHASE baseline (FULL video; clips reserved for detect/link) ===")
     for path in paths:
-        key = f"baseline::{path.stem}"
+        # Probe tag without loading pixels twice: count then prep full.
+        source_n = count_timepoints(path)
+        tag = frame_range_tag(0, source_n, source_n)
+        key = exp_key("baseline", path, tag)
+        # Legacy clip key must NOT skip full-video baseline.
+        legacy = f"baseline::{path.stem}"
         if is_done(state, key):
             log(f"skip {key}")
             continue
-        log(f"baseline {path.name}")
-        video, meta = prep_video(path, CLIP_FRAMES, CLIP_CROP)
-        detect = DetectCfg()  # raw defaults = "unchanged" intent on clip
+        if is_done(state, legacy):
+            log(f"note: legacy clip key {legacy} present; still running full {key}")
+        log(f"baseline FULL {path.name} key={key}")
+        video, meta = prep_video(path, None, CLIP_CROP)
+        assert meta["frame_tag"] == tag
+        detect = DetectCfg()
         link = LinkCfg(method="trackastra_greedy", trackastra_mode="greedy")
-        # Truly unchanged entrypoint uses gpu=True in track.py; we force CPU
-        # for Coder survival but keep model/linker defaults.
         table, masks, runtime = run_pipeline(
             video,
             detect,
             link,
             cache_dir=OUT / "cache" / path.stem,
-            cache_key="baseline_raw",
+            cache_key=f"baseline_raw_{tag}",
+            meta=meta,
         )
         m = track_metrics(table, video.shape[0])
-        exp_dir = OUT / "baseline" / path.stem
+        exp_dir = OUT / "baseline" / path.stem / tag
         exp_dir.mkdir(parents=True, exist_ok=True)
         table.to_csv(exp_dir / "tracks.csv", index=False)
-        (exp_dir / "meta.json").write_text(json.dumps({**meta, **asdict(detect), **asdict(link), **m, "runtime_s": runtime}, indent=2))
+        (exp_dir / "meta.json").write_text(
+            json.dumps({**meta, **asdict(detect), **asdict(link), **m, "runtime_s": runtime}, indent=2)
+        )
         np.savez_compressed(exp_dir / "masks.npz", masks=masks)
         save_overlay(video, table, exp_dir / "overlay_f5.png", 5)
         examples = diagnose_short_tracks(video, masks, table, exp_dir / "diagnose")
@@ -548,6 +654,9 @@ def phase_baseline(state: dict, paths: list[Path]) -> None:
                 "phase": "baseline",
                 "video": path.name,
                 "key": key,
+                "frame_tag": tag,
+                "source_timepoints": meta["source_timepoints"],
+                "selected_frames": meta["selected_frames"],
                 "score": score_row(m),
                 "runtime_s": runtime,
                 **{f"m_{k}": v for k, v in m.items()},
@@ -560,17 +669,20 @@ def phase_baseline(state: dict, paths: list[Path]) -> None:
         )
         mark_done(state, key)
         log(f"baseline done {path.name} score={score_row(m):.3f} median_frac={m['median_frac']:.3f}")
+        del table, masks, video
+        free_mem("after baseline")
 
 
 def phase_detect_sweep(state: dict, paths: list[Path]) -> None:
-    log("=== PHASE detect sweep ===")
+    log(f"=== PHASE detect sweep (CLIP_FRAMES={CLIP_FRAMES} only) ===")
     preprocesses = ["raw", "invert", "invert_clahe"]
     diameters = [None, 30.0, 40.0, 50.0]
     for path in paths:
-        video, _meta = prep_video(path, CLIP_FRAMES, CLIP_CROP)
+        video, meta = prep_video(path, CLIP_FRAMES, CLIP_CROP)
+        tag = meta["frame_tag"]
         for prep in preprocesses:
             for diam in diameters:
-                key = f"detect::{path.stem}::{prep}::d{diam}"
+                key = exp_key("detect", path, tag, prep, f"d{diam}")
                 if is_done(state, key):
                     continue
                 log(f"detect {key}")
@@ -582,7 +694,8 @@ def phase_detect_sweep(state: dict, paths: list[Path]) -> None:
                         detect,
                         link,
                         cache_dir=OUT / "cache" / path.stem,
-                        cache_key=f"{prep}_d{diam}",
+                        cache_key=f"{tag}_{prep}_d{diam}",
+                        meta=meta,
                     )
                     m = track_metrics(table, video.shape[0])
                     exp_dir = OUT / "detect" / path.stem / f"{prep}_d{diam}"
@@ -594,6 +707,9 @@ def phase_detect_sweep(state: dict, paths: list[Path]) -> None:
                             "phase": "detect",
                             "video": path.name,
                             "key": key,
+                            "frame_tag": tag,
+                            "source_timepoints": meta["source_timepoints"],
+                            "selected_frames": meta["selected_frames"],
                             "score": score_row(m),
                             "runtime_s": runtime,
                             **{f"m_{k}": v for k, v in m.items()},
@@ -606,10 +722,13 @@ def phase_detect_sweep(state: dict, paths: list[Path]) -> None:
                     )
                     mark_done(state, key)
                     log(f"detect done {key} score={score_row(m):.3f}")
+                    del table, masks
+                    free_mem("after detect")
                 except Exception as e:
                     log(f"detect FAIL {key}: {e}")
                     traceback.print_exc()
                     mark_done(state, key)  # avoid infinite retry on hard fail
+                    free_mem("after detect fail")
 
 
 def best_detect_for_video(video_name: str) -> DetectCfg:
@@ -629,11 +748,12 @@ def best_detect_for_video(video_name: str) -> DetectCfg:
 
 
 def phase_link_sweep(state: dict, paths: list[Path]) -> None:
-    log("=== PHASE link sweep ===")
+    log(f"=== PHASE link sweep (CLIP_FRAMES={CLIP_FRAMES} only) ===")
     for path in paths:
-        video, _meta = prep_video(path, CLIP_FRAMES, CLIP_CROP)
+        video, meta = prep_video(path, CLIP_FRAMES, CLIP_CROP)
+        tag = meta["frame_tag"]
         detect = best_detect_for_video(path.name)
-        cache_key = f"{detect.preprocess}_d{detect.diameter}"
+        cache_key = f"{tag}_{detect.preprocess}_d{detect.diameter}"
         # ensure masks cached
         run_pipeline(
             video,
@@ -641,22 +761,27 @@ def phase_link_sweep(state: dict, paths: list[Path]) -> None:
             LinkCfg(method="trackastra_greedy"),
             cache_dir=OUT / "cache" / path.stem,
             cache_key=cache_key,
+            meta=meta,
         )
         # estimate displacement from baseline tracks if present
-        base_tracks = OUT / "baseline" / path.stem / "tracks.csv"
+        base_tracks = OUT / "baseline" / path.stem
+        # prefer full-baseline tracks under tag subdir
+        candidates = list(base_tracks.glob("**/tracks.csv"))
         max_dists = [12.0, 20.0, 30.0, 40.0]
-        if base_tracks.exists():
-            bt = pd.read_csv(base_tracks)
-            if not bt.empty:
-                disp = []
-                for _, g in bt.groupby("cell_id"):
-                    g = g.sort_values("frame")
-                    if len(g) >= 2:
-                        d = np.hypot(np.diff(g["x"]), np.diff(g["y"]))
-                        disp.extend(d.tolist())
-                if disp:
-                    p90 = float(np.percentile(disp, 90))
-                    max_dists = sorted(set([max(8.0, p90), p90 * 1.5, p90 * 2.0, 30.0]))
+        for tracks_path in candidates:
+            bt = pd.read_csv(tracks_path)
+            if bt.empty:
+                continue
+            disp = []
+            for _, g in bt.groupby("cell_id"):
+                g = g.sort_values("frame")
+                if len(g) >= 2:
+                    d = np.hypot(np.diff(g["x"]), np.diff(g["y"]))
+                    disp.extend(d.tolist())
+            if disp:
+                p90 = float(np.percentile(disp, 90))
+                max_dists = sorted(set([max(8.0, p90), p90 * 1.5, p90 * 2.0, 30.0]))
+                break
 
         link_cfgs = [
             LinkCfg(method="trackastra_greedy", trackastra_mode="greedy"),
@@ -669,7 +794,15 @@ def phase_link_sweep(state: dict, paths: list[Path]) -> None:
                 )
 
         for link in link_cfgs:
-            key = f"link::{path.stem}::{link.method}::d{link.max_dist}::g{link.max_gap}::{link.trackastra_mode}"
+            key = exp_key(
+                "link",
+                path,
+                tag,
+                link.method,
+                f"d{link.max_dist}",
+                f"g{link.max_gap}",
+                link.trackastra_mode,
+            )
             if is_done(state, key):
                 continue
             log(f"link {key}")
@@ -680,6 +813,7 @@ def phase_link_sweep(state: dict, paths: list[Path]) -> None:
                     link,
                     cache_dir=OUT / "cache" / path.stem,
                     cache_key=cache_key,
+                    meta=meta,
                 )
                 m = track_metrics(table, video.shape[0])
                 exp_dir = OUT / "link" / path.stem / key.replace("::", "__")
@@ -691,6 +825,9 @@ def phase_link_sweep(state: dict, paths: list[Path]) -> None:
                         "phase": "link",
                         "video": path.name,
                         "key": key,
+                        "frame_tag": tag,
+                        "source_timepoints": meta["source_timepoints"],
+                        "selected_frames": meta["selected_frames"],
                         "score": score_row(m),
                         "runtime_s": runtime,
                         **{f"m_{k}": v for k, v in m.items()},
@@ -703,10 +840,13 @@ def phase_link_sweep(state: dict, paths: list[Path]) -> None:
                 )
                 mark_done(state, key)
                 log(f"link done {key} score={score_row(m):.3f}")
+                del table, masks
+                free_mem("after link")
             except Exception as e:
                 log(f"link FAIL {key}: {e}")
                 traceback.print_exc()
                 mark_done(state, key)
+                free_mem("after link fail")
 
 
 def best_config_overall() -> tuple[DetectCfg, LinkCfg]:
@@ -750,24 +890,30 @@ def best_config_overall() -> tuple[DetectCfg, LinkCfg]:
 
 
 def phase_final(state: dict, paths: list[Path]) -> None:
-    log("=== PHASE final ===")
+    log("=== PHASE final (FULL video) ===")
     detect, link = best_config_overall()
     log(f"winner config detect={detect} link={link}")
     for path in paths:
-        key = f"final::{path.stem}"
+        source_n = count_timepoints(path)
+        tag = frame_range_tag(0, source_n, source_n)
+        key = exp_key("final", path, tag)
+        legacy = f"final::{path.stem}"
         if is_done(state, key):
             continue
-        log(f"final {path.name}")
-        video, meta = prep_video(path, FINAL_FRAMES, CLIP_CROP)
+        if is_done(state, legacy):
+            log(f"note: legacy {legacy} present; still running full {key}")
+        log(f"final FULL {path.name} key={key}")
+        video, meta = prep_video(path, None, CLIP_CROP)
         table, masks, runtime = run_pipeline(
             video,
             detect,
             link,
             cache_dir=OUT / "cache" / path.stem,
-            cache_key=f"final_{detect.preprocess}_d{detect.diameter}",
+            cache_key=f"final_{tag}_{detect.preprocess}_d{detect.diameter}",
+            meta=meta,
         )
         m = track_metrics(table, video.shape[0])
-        exp_dir = OUT / "final" / path.stem
+        exp_dir = OUT / "final" / path.stem / tag
         exp_dir.mkdir(parents=True, exist_ok=True)
         table.to_csv(exp_dir / "tracks.csv", index=False)
         (exp_dir / "config.json").write_text(
@@ -775,12 +921,14 @@ def phase_final(state: dict, paths: list[Path]) -> None:
         )
         save_overlay(video, table, exp_dir / "overlay_f5.png", 5)
         save_overlay(video, table, exp_dir / "overlay_f20.png", min(20, video.shape[0] - 1))
-        # baseline overlay copy pointer for side-by-side
         append_result(
             {
                 "phase": "final",
                 "video": path.name,
                 "key": key,
+                "frame_tag": tag,
+                "source_timepoints": meta["source_timepoints"],
+                "selected_frames": meta["selected_frames"],
                 "score": score_row(m),
                 "runtime_s": runtime,
                 **{f"m_{k}": v for k, v in m.items()},
@@ -793,6 +941,8 @@ def phase_final(state: dict, paths: list[Path]) -> None:
         )
         mark_done(state, key)
         log(f"final done {path.name} score={score_row(m):.3f}")
+        del table, masks, video
+        free_mem("after final")
 
 
 def write_morning_report() -> None:
@@ -895,27 +1045,67 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--phase",
-        default="all",
-        choices=["all", "baseline", "detect", "link", "final", "report"],
+        default="staged",
+        choices=[
+            "staged",
+            "all",
+            "legacy",
+            "baseline",
+            "detect",
+            "link",
+            "final",
+            "report",
+        ],
+        help="Default: staged bar15 schedule (screen10→tune30→60…271). "
+        "Use legacy/baseline/detect/link/final for the old sweep.",
+    )
+    parser.add_argument(
+        "--video",
+        action="append",
+        default=None,
+        help="Limit to this filename in data/ (repeatable). "
+        f"Default: {DEFAULT_VIDEOS} (bar15-only overnight).",
+    )
+    parser.add_argument(
+        "--all-videos",
+        action="store_true",
+        help="Use every MP4 in data/ (overrides bar15-only default).",
     )
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
     state = load_state()
-    paths = video_paths()
+    if args.all_videos:
+        only = None
+    elif args.video:
+        only = args.video
+    else:
+        only = list(DEFAULT_VIDEOS)
+    paths = video_paths(only=only)
+    if len(paths) != 1 or "bar15" not in paths[0].name:
+        if not args.all_videos:
+            log(f"WARN expected single bar15 video, got {[p.name for p in paths]}")
     log(f"videos: {[p.name for p in paths]}")
     log(f"phase={args.phase}")
+    assert all("bar15" in p.name for p in paths) or args.all_videos, (
+        "bar15-only mode: refusing non-bar15 paths"
+    )
 
     try:
-        if args.phase in ("all", "baseline"):
+        if args.phase in ("staged", "all"):
+            from staged_optimize import run_staged
+
+            run_staged(state, only=only)
+            return
+        if args.phase in ("legacy", "baseline"):
             phase_baseline(state, paths)
-        if args.phase in ("all", "detect"):
+        if args.phase in ("legacy", "detect"):
             phase_detect_sweep(state, paths)
-        if args.phase in ("all", "link"):
+        if args.phase in ("legacy", "link"):
             phase_link_sweep(state, paths)
-        if args.phase in ("all", "final"):
+        if args.phase in ("legacy", "final"):
             phase_final(state, paths)
-        if args.phase in ("all", "report", "final"):
+        if args.phase in ("legacy", "report", "final"):
             write_morning_report()
         log("ALL REQUESTED PHASES COMPLETE")
     except Exception as e:

@@ -22,10 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 TRACKS_PATH = ROOT / "output" / "tracks.csv"
 
 # Cellpose 4.2 ships cpsam, cpsam_v2, cpdino, and cpdino-vitb.
-# cpsam and cpsam_v2 are about 1.15 GB. cpdino is about the same size.
-# cpdino-vitb is about 328 MB, but it needs the dinov3 package, which is
-# not installed. cpsam_v2 is the model we can actually run.
-CELLPOSE_MODEL = "cpsam_v2"
+# cpsam / cpsam_v2 / cpdino are ~1.15 GB. cpdino-vitb is ~328 MB and needs
+# dinov3 (`pip install git+https://github.com/facebookresearch/dinov3`).
+CELLPOSE_MODEL = "cpdino-vitb"
 
 # A CPU box with 8 GB of RAM cannot segment a whole movie.
 CPU_FRAMES = 10

@@ -14,12 +14,13 @@ Tracking writes `output/tracks.csv` (`cell_id, frame, x, y`). `data/` and `outpu
 
 ## Data formats
 tracks.csv:          cell_id, frame, x, y
-motion.csv:          cell_id, frame, x, y, vx, vy, speed, direction_deg, dist_poa, radial_v, angular_v
+motion.csv:          cell_id, frame, x, y, vx, vy, speed, direction_deg, dist_poa, radial_v
 clusters.csv:        frame, cell_id, cluster_id
-cluster_summary.csv: frame, cluster_id, n_cells, mean_x, mean_y, mean_vx, mean_vy, mean_speed, mean_radial_v, mean_angular_v
+cluster_summary.csv: frame, cluster_id, n_cells, mean_x, mean_y, mean_vx, mean_vy, mean_speed, mean_radial_v
 summary.json:        global stats, cluster ranking, text descriptions
 Sounds:              output/overview.wav, output/cluster_1.wav, ...
 
-Conventions: POA defaults to image center. radial_v negative = toward POA.
-angular_v positive = counterclockwise (radians per unit time).
+Conventions: POA defaults to image center (`--poa X Y` to override).
+radial_v negative = toward POA. No angular velocity.
 Units: pixels/frame unless pixel size + frame time are given.
+bar15 scale: ~1.30 µm/px (100 µm ≈ 77 px).
