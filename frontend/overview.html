@@ -110,26 +110,34 @@
     <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Ready. Press Play overview to start. Sound never plays on its own.</p>
   </section>
 
+  <section class="card" aria-labelledby="video-h" id="cluster-video-card" hidden>
+    <div class="copy">
+      <h2 id="video-h">Cluster tracking video</h2>
+      <p class="hint">Chunks drawn on the tracked frames. Watch the overview story, then open clusters for each chunk.</p>
+    </div>
+    <video id="cluster-video" controls playsinline style="width:100%;max-width:28rem;border-radius:12px;background:#000"></video>
+  </section>
+
   <section class="card" aria-labelledby="trace-h">
     <div class="hero-bar">
         <div class="copy">
-        <h2 id="trace-h">Cluster traces</h2>
-        <p class="hint">Every cell's path, colored by cluster. Drawn from your tracking results.</p>
+        <h2 id="trace-h">Chunk trails</h2>
+        <p class="hint">Each chunk's center path over time, colored by chunk.</p>
       </div>
       <div class="field">
         <label for="trace-show">Show</label>
-        <select class="select" id="trace-show"><option value="all">All clusters</option></select>
+        <select class="select" id="trace-show"><option value="all">All chunks</option></select>
       </div>
     </div>
     <div class="split">
       <svg class="trace-svg" id="traces" role="img" aria-labelledby="trace-title" viewBox="0 0 512 512">
-        <title id="trace-title">Cluster traces are loading.</title>
+        <title id="trace-title">Chunk trails are loading.</title>
         <rect id="trace-backdrop" width="512" height="512" fill="var(--header)"></rect>
         <image id="trace-image" x="0" y="0" width="512" height="512" preserveAspectRatio="none"></image>
         <g id="trace-paths"></g>
         <g id="trace-poa"></g>
       </svg>
-      <ul class="legend-list" id="trace-legend" aria-label="Cluster colors"></ul>
+      <ul class="legend-list" id="trace-legend" aria-label="Chunk colors"></ul>
     </div>
   </section>
 
@@ -147,8 +155,8 @@
 
   <section class="card desc-band" aria-labelledby="desc-h">
     <div class="copy">
-      <h2 id="desc-h" tabindex="-1">Description</h2>
-      <p id="desc-text">The description will appear when the summary loads.</p>
+      <h2 id="desc-h" tabindex="-1">Video overview</h2>
+      <p id="desc-text">The overview will appear when the summary loads.</p>
     </div>
     <div style="overflow-x:auto">
       <table class="stats">

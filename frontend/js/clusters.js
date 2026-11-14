@@ -62,15 +62,15 @@ function fillPick(cluster) {
   text.replaceChildren();
   const name = document.createElement("strong");
   const selectedNow = cluster === selected();
-  name.textContent = "Cluster " + cluster.cluster_id + ": " + cluster.name;
+  name.textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
   const meta = document.createElement("span");
-  meta.textContent = cluster.n_cells + " cells · " + instrumentName(instrumentOf(cluster)) + (selectedNow ? " · selected" : "");
+  meta.textContent = "~" + cluster.n_cells + " cells · " + instrumentName(instrumentOf(cluster)) + (selectedNow ? " · selected" : "");
   text.appendChild(name);
   text.appendChild(meta);
   if (cluster.unusual) {
     const tag = document.createElement("span");
     tag.className = "tag";
-    tag.textContent = "Unusual: moves outward";
+    tag.textContent = "Unusual: against the trend";
     text.appendChild(tag);
   }
   const button = document.getElementById("pick-" + cluster.cluster_id);
@@ -85,23 +85,28 @@ function showDetail() {
   const dot = document.getElementById("detail-dot");
   dot.textContent = String(cluster.cluster_id);
   dot.style.background = cluster.color;
-  document.getElementById("detail-h").textContent = "Cluster " + cluster.cluster_id + ": " + cluster.name;
-  document.getElementById("detail-meta").textContent = cluster.n_cells + " cells · rank " + cluster.rank + " of " + clusters.length;
+  document.getElementById("detail-h").textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
+  document.getElementById("detail-meta").textContent = "~" + cluster.n_cells + " cells · rank " + cluster.rank + " of " + clusters.length;
   document.getElementById("detail-desc").textContent = cluster.description || "";
-  document.getElementById("cmp-caption").textContent = "Cluster " + cluster.cluster_id + " compared with all cells";
+  document.getElementById("cmp-caption").textContent = "Chunk " + cluster.cluster_id + " compared with the whole video";
   document.getElementById("cmp-speed").textContent = plain(cluster.mean_speed, 1) + " " + units.speed;
   document.getElementById("all-speed").textContent = plain(pop.mean_speed, 1) + " " + units.speed;
+  document.getElementById("cmp-along").textContent = signed(cluster.along_trend != null ? cluster.along_trend : 0, 2) + " " + units.speed;
+  document.getElementById("all-along").textContent = signed(pop.trend_speed != null ? pop.trend_speed : 0, 2) + " " + units.speed + (pop.trend_compass ? (" " + pop.trend_compass) : "");
   document.getElementById("cmp-radial").textContent = signed(cluster.mean_radial_v, 1) + " " + units.speed;
   document.getElementById("all-radial").textContent = signed(pop.mean_radial_v, 1) + " " + units.speed;
-  document.getElementById("cmp-angular").textContent = signed(cluster.mean_angular_v, 2) + " " + units.angular;
-  document.getElementById("all-angular").textContent = signed(pop.mean_angular_v, 2) + " " + units.angular;
+  const path = document.getElementById("cmp-path");
+  if (path) {
+    path.textContent = (cluster.start_region || "?") + " → " + (cluster.end_region || "?");
+    path.colSpan = 2;
+  }
   instrumentSelect.value = instrumentOf(cluster);
   document.getElementById("prev").disabled = current === 0;
   document.getElementById("next").disabled = current === clusters.length - 1;
   const explore = document.getElementById("explore");
   explore.href = hrefWithJob("export.html");
   explore.textContent = "Go to export";
-  playLabel.textContent = (playing ? "Pause cluster " : "Play cluster ") + cluster.cluster_id;
+  playLabel.textContent = (playing ? "Pause chunk " : "Play chunk ") + cluster.cluster_id;
   clusters.forEach(fillPick);
 }
 
@@ -237,15 +242,15 @@ window.addEventListener("pagehide", function () {
 getSummary(currentJobId() || "a1b2c3").then(function (data) {
   summary = data;
   clusters = (data.clusters || []).slice().sort(function (a, b) { return a.rank - b.rank; });
-  document.getElementById("page-title").textContent = "Explore the " + clusters.length + " clusters";
+  document.getElementById("page-title").textContent = "Explore the " + clusters.length + " chunks";
   if (!clusters.length) {
-    say("No cells were tracked, so there are no clusters to explore.");
+    say("No cells were tracked, so there are no chunks to explore.");
     return;
   }
   buildList();
   showDetail();
   const first = selected();
-  say("Cluster " + first.cluster_id + " selected. Press Play to hear it alone.");
+  say("Chunk " + first.cluster_id + " selected. Press Play to hear it alone.");
 }).catch(function (error) {
   say(error.message);
 });

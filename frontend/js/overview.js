@@ -197,9 +197,9 @@ function drawTraces() {
   const chosen = summary.clusters.find(function (cluster) { return String(cluster.cluster_id) === show; });
   const words = show === "all" || !chosen
     ? traces.description
-    : "Showing cluster " + chosen.cluster_id + ", " + chosen.name + ", only. Other clusters are faded.";
+    : "Showing chunk " + chosen.cluster_id + ", " + chosen.name + ", only. Other chunks are faded.";
   title.textContent = words;
-  document.getElementById("traces").setAttribute("aria-label", words);
+  svg.setAttribute("aria-label", words);
 }
 
 function fillLegend() {
@@ -209,7 +209,7 @@ function fillLegend() {
   summary.clusters.forEach(function (cluster) {
     const option = document.createElement("option");
     option.value = String(cluster.cluster_id);
-    option.textContent = "Cluster " + cluster.cluster_id + " only";
+    option.textContent = "Chunk " + cluster.cluster_id + " only";
     show.appendChild(option);
     const item = document.createElement("li");
     const swatch = document.createElement("span");
@@ -218,7 +218,7 @@ function fillLegend() {
     swatch.style.background = cluster.color;
     const text = document.createElement("span");
     const unusual = cluster.unusual ? " (unusual)" : "";
-    text.innerHTML = "<strong>Cluster " + cluster.cluster_id + "</strong> · " + cluster.name + unusual + " · " + cluster.n_cells + " cells";
+    text.innerHTML = "<strong>Chunk " + cluster.cluster_id + "</strong> · " + cluster.name + unusual + " · ~" + cluster.n_cells + " cells";
     item.appendChild(swatch);
     item.appendChild(text);
     list.appendChild(item);
@@ -229,28 +229,34 @@ function fillLegend() {
 }
 
 function fillSummary() {
-  const pop = summary.population;
+  const pop = summary.population || {};
+  const overview = summary.overview || {};
   const units = summary.units || { speed: "", angular: "" };
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem("cellsound-calibration") || "null"); } catch (error) { saved = null; }
   const minutes = saved && saved.minutes_per_frame ? Number(saved.minutes_per_frame) : 0;
-  timed = minutes > 0;
-  totalMinutes = pop.duration_min;
-  totalFrames = timed ? Math.round(pop.duration_min / minutes) : pop.duration_min;
-  const about = Math.floor(pop.duration_min / 60);
-  const length = timed
-    ? pop.n_cells + " cells over " + totalFrames + " frames, about " + about + " hours."
-    : pop.n_cells + " cells over " + totalFrames + " frames. No time calibration was saved, so the timeline is in frames.";
-  document.getElementById("hero-lede").textContent = length + " Listen first, then read the plain-language summary below.";
-  document.getElementById("desc-text").textContent = pop.description;
-  const mainCount = Math.round(pop.n_cells * pop.pct_main_pattern / 100);
-  const unusual = summary.clusters.some(function (cluster) { return cluster.unusual; });
+  const nFrames = Number(pop.n_frames || 0);
+  timed = minutes > 0 && pop.duration_min != null;
+  totalMinutes = timed ? Number(pop.duration_min) : nFrames;
+  totalFrames = nFrames || (timed ? Math.max(1, Math.round(Number(pop.duration_min) / minutes)) : Math.max(1, Math.round(totalMinutes)));
+  const hours = timed ? (Number(pop.duration_min) / 60) : 0;
+  const span = timed
+    ? ((hours >= 1 ? (Math.round(hours * 10) / 10) + " hours" : Math.round(Number(pop.duration_min)) + " minutes"))
+    : "no time calibration, timeline in frames";
+  document.getElementById("hero-lede").textContent =
+    (pop.n_cells || 0) + " cells in " + (pop.n_clusters || 0) + " chunks over " + totalFrames +
+    " frames (" + span + "). Read the overview, watch the cluster video, then open chunks.";
+  document.getElementById("desc-text").textContent =
+    overview.description || pop.description || "No overview is ready yet.";
+  const mainCount = Math.round((pop.n_cells || 0) * (pop.pct_main_pattern || 0) / 100);
+  const unusual = (summary.clusters || []).some(function (cluster) { return cluster.unusual; });
+  const trend = pop.trend_compass ? ("Drift " + pop.trend_compass) : "Net population drift";
   const rows = [
-    ["Average speed", pop.mean_speed + " " + units.speed, "Slow, steady movement"],
-    ["Toward or away", pop.mean_radial_v + " " + units.speed, "Negative means toward the Point of Audio"],
-    ["Circling", (pop.mean_angular_v > 0 ? "+" : "") + pop.mean_angular_v + " " + units.angular, "Positive means counterclockwise"],
-    ["Cells following the main pattern", pop.pct_main_pattern + "%", mainCount + " of " + pop.n_cells + " cells"],
-    ["Groups found", String(pop.n_clusters), unusual ? "One moves outward" : "Groups of similar cells"]
+    ["Average speed", (pop.mean_speed != null ? pop.mean_speed : "—") + " " + (units.speed || ""), "Typical chunk speed"],
+    ["Main trend", trend + (pop.trend_speed != null ? (" · " + pop.trend_speed + " " + (units.speed || "")) : ""), "Chunks are ranked by how well they match this"],
+    ["Toward or away", (pop.mean_radial_v != null ? pop.mean_radial_v : "—") + " " + (units.speed || ""), "Negative means toward the Point of Audio"],
+    ["Following the main pattern", (pop.pct_main_pattern != null ? pop.pct_main_pattern : "—") + "%", mainCount + " of " + (pop.n_cells || 0) + " cells"],
+    ["Chunks found", String(pop.n_clusters || 0), unusual ? "Some chunks move against the trend" : "Ranked for listening next"]
   ];
   const body = document.getElementById("stats-body");
   body.replaceChildren();
@@ -263,8 +269,16 @@ function fillSummary() {
   document.getElementById("trust-h").textContent = "Tracking reliability: " + (trust.level || "unknown") + (trust.note ? ", with one note" : "");
   document.getElementById("trust-note").textContent = trust.note ? trust.note + " Treat those cells' values with care." : "";
   const explore = document.getElementById("explore");
-  explore.textContent = "Explore the " + pop.n_clusters + " clusters";
+  explore.textContent = "Explore the " + (pop.n_clusters || 0) + " chunks";
   explore.href = hrefWithJob("clusters.html");
+  const videoCard = document.getElementById("cluster-video-card");
+  const video = document.getElementById("cluster-video");
+  if (traces && traces.cluster_video_url && videoCard && video) {
+    video.src = "/api/jobs/" + encodeURIComponent(jobId) + "/clusters_overlay.mp4";
+    videoCard.hidden = false;
+  } else if (videoCard) {
+    videoCard.hidden = true;
+  }
   showPosition();
 }
 

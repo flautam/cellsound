@@ -25,8 +25,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from backend.results import build_analysis
-from backend.sonify import write_sounds
+from backend.pipeline import run_job_analysis
 from backend.track import choose_device, limit_for_cpu, link_tracks, segment_nuclei, select_frames
 from backend.video import load_video
 
@@ -79,11 +78,39 @@ def _preview_frame(frame):
     return image
 
 
+def _source_fps(video_path: Path) -> float:
+    """Read the upload's frame rate; fall back to 15 if metadata is missing."""
+    try:
+        fps = iio.improps(video_path).fps
+        if fps and float(fps) > 0:
+            return float(fps)
+    except Exception:
+        pass
+    try:
+        import cv2
+
+        cap = cv2.VideoCapture(str(video_path))
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0)
+        cap.release()
+        if fps > 0:
+            return fps
+    except Exception:
+        pass
+    return 15.0
+
+
 def _track(job_id: str, video_path: Path) -> None:
     try:
         device = choose_device()
         frame_limit, crop, note = limit_for_cpu(device.type, None, None)
-        _write_meta(job_id, status="running", stage="received", message=note or "Video received")
+        source_fps = _source_fps(video_path)
+        _write_meta(
+            job_id,
+            status="running",
+            stage="received",
+            message=note or "Video received",
+            fps=source_fps,
+        )
         video = select_frames(load_video(video_path, max_frames=frame_limit), None, crop)
         total, height, width = (int(video.shape[0]), int(video.shape[1]), int(video.shape[2]))
         _write_meta(
@@ -93,6 +120,7 @@ def _track(job_id: str, video_path: Path) -> None:
             total_frames=total,
             width=width,
             height=height,
+            fps=source_fps,
             message="Detecting and tracking nuclei",
         )
 
@@ -104,6 +132,28 @@ def _track(job_id: str, video_path: Path) -> None:
         folder = _job_dir(job_id)
         table.to_csv(folder / "tracks.csv", index=False)
         iio.imwrite(folder / "frame0.png", _preview_frame(video[0]))
+        # Save the exact frames used for tracking so cluster overlays match.
+        try:
+            import cv2
+
+            gray_u8 = _preview_frame(video)
+            if gray_u8.ndim == 2:
+                gray_u8 = gray_u8[np.newaxis, ...]
+            rgb = np.stack([gray_u8, gray_u8, gray_u8], axis=-1)
+            tmp = folder / "tracked.tmp.mp4"
+            writer = cv2.VideoWriter(
+                str(tmp),
+                cv2.VideoWriter_fourcc(*"mp4v"),
+                float(source_fps),
+                (width, height),
+            )
+            for frame in rgb:
+                writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            writer.release()
+            tmp.replace(folder / "tracked.mp4")
+        except Exception:
+            # Overlay render will skip if this file is missing.
+            pass
         _write_meta(
             job_id,
             status="done",
@@ -111,6 +161,9 @@ def _track(job_id: str, video_path: Path) -> None:
             frame=total,
             total_frames=total,
             message="Tracking finished",
+            width=width,
+            height=height,
+            fps=source_fps,
         )
     except Exception as exc:
         traceback.print_exc()
@@ -216,35 +269,30 @@ def analyze(job_id: str, body: dict):
         return JSONResponse(status_code=404, content={"error": "not_ready", "message": "Tracking is not finished yet."})
     meta = _read_meta(job_id)
     tracks = pd.read_csv(tracks_path)
+    folder = _job_dir(job_id)
     try:
-        summary, traces, motion = build_analysis(
+        _write_meta(job_id, status="running", stage="measuring", message="Clustering and writing summaries")
+        run_job_analysis(
+            folder,
             tracks,
             body,
             int(meta.get("width") or 1),
             int(meta.get("height") or 1),
             meta.get("pixel_size_um"),
             meta.get("minutes_per_frame"),
+            fps=meta.get("fps"),
         )
     except Exception as exc:
+        traceback.print_exc()
         _write_meta(job_id, status="error", message=str(exc) or "The analysis could not finish.")
         return JSONResponse(status_code=500, content={"error": "analysis_failed", "message": str(exc)})
-    folder = _job_dir(job_id)
-    traces["image_url"] = f"/api/jobs/{job_id}/frame0.png"
-    (folder / "summary.json").write_text(json.dumps(summary))
-    (folder / "traces.json").write_text(json.dumps(traces))
+    # Pipeline already wrote summary/traces/overlay; attach frame0 for the trail backdrop.
+    traces_path = folder / "traces.json"
+    if traces_path.exists():
+        traces = json.loads(traces_path.read_text())
+        traces["image_url"] = f"/api/jobs/{job_id}/frame0.png"
+        traces_path.write_text(json.dumps(traces, indent=2))
     (folder / "settings.json").write_text(json.dumps(body))
-    if not motion.empty:
-        motion.to_csv(folder / "motion.csv", index=False)
-    poa = body.get("poa") or {}
-    write_sounds(
-        folder / "sounds",
-        motion,
-        summary,
-        float(poa.get("x", 0)),
-        float(poa.get("y", 0)),
-        int(meta.get("width") or 1),
-        int(meta.get("height") or 1),
-    )
     _write_meta(job_id, status="done", stage="done", message="Analysis finished")
     return {"status": "done"}
 
@@ -275,6 +323,17 @@ def audio(job_id: str, name: str):
     return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/jobs/{job_id}/clusters_overlay.mp4")
+def clusters_overlay(job_id: str):
+    path = _job_dir(job_id) / "clusters_overlay.mp4"
+    if not path.exists():
+        return JSONResponse(
+            status_code=404,
+            content={"error": "missing_video", "message": "The cluster overlay video is not ready yet."},
+        )
+    return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/jobs/{job_id}/export.zip")
 def export_zip(job_id: str, include: str = "audio,text,data,settings"):
     folder = _job_dir(job_id)
@@ -285,14 +344,26 @@ def export_zip(job_id: str, include: str = "audio,text,data,settings"):
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         if "text" in wanted:
             summary_json = json.loads((folder / "summary.json").read_text())
-            lines = [summary_json["population"]["description"], ""]
-            for cluster in summary_json["clusters"]:
-                lines.append(f"Cluster {cluster['cluster_id']}: {cluster['name']}. {cluster['description']}")
+            overview = (summary_json.get("overview") or {}).get("description") or summary_json["population"]["description"]
+            lines = ["Video overview", overview, "", "Chunks"]
+            for cluster in summary_json.get("clusters", []):
+                lines.append(
+                    f"Chunk {cluster['cluster_id']} (rank {cluster.get('rank', '?')}): "
+                    f"{cluster.get('name', '')}. {cluster.get('description', '')}"
+                )
             archive.writestr("descriptions/summary.txt", "\n".join(lines) + "\n")
         if "data" in wanted and (folder / "tracks.csv").exists():
             archive.write(folder / "tracks.csv", "data/tracks.csv")
             if (folder / "motion.csv").exists():
                 archive.write(folder / "motion.csv", "data/motion.csv")
+            if (folder / "clusters.csv").exists():
+                archive.write(folder / "clusters.csv", "data/clusters.csv")
+            if (folder / "cluster_summary.csv").exists():
+                archive.write(folder / "cluster_summary.csv", "data/cluster_summary.csv")
+            if (folder / "cluster_analysis.csv").exists():
+                archive.write(folder / "cluster_analysis.csv", "data/cluster_analysis.csv")
+            if (folder / "clusters_overlay.mp4").exists():
+                archive.write(folder / "clusters_overlay.mp4", "data/clusters_overlay.mp4")
         if "settings" in wanted and (folder / "settings.json").exists():
             archive.write(folder / "settings.json", "settings.json")
         if "audio" in wanted and (folder / "sounds").exists():

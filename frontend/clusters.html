@@ -64,13 +64,13 @@
         <span data-pause-label>Pause animations</span>
       </button>
     </div>
-    <h1 id="page-title">Explore the clusters</h1>
-    <p class="lede">Cells that move alike are grouped together. Each group has its own instrument, so you can tell them apart by ear. Ranked from most to least typical.</p>
+    <h1 id="page-title">Explore the chunks</h1>
+    <p class="lede">After the video overview, step through each chunk: where it started, where it went, and how fast it moved. Ranked by how well each matches the main trend.</p>
   </div>
 </div>
 <div class="page cluster-layout">
   <section class="cluster-list" id="help" aria-labelledby="list-h">
-    <h2 id="list-h">Clusters, most typical first</h2>
+    <h2 id="list-h">Chunks, strongest trend match first</h2>
     <ol class="cluster-picks" id="cluster-picks"></ol>
     <label class="check-label" for="keys-on"><input type="checkbox" id="keys-on" checked> Use N and P keys for next and previous cluster</label>
   </section>
@@ -115,12 +115,13 @@
         <thead><tr><th scope="col">Measure</th><th scope="col">This cluster</th><th scope="col">All cells</th></tr></thead>
         <tbody>
           <tr><th scope="row">Average speed</th><td id="cmp-speed"></td><td id="all-speed"></td></tr>
+          <tr><th scope="row">Along main trend</th><td id="cmp-along"></td><td id="all-along"></td></tr>
           <tr><th scope="row">Toward (−) or away (+)</th><td id="cmp-radial"></td><td id="all-radial"></td></tr>
-          <tr><th scope="row">Circling (+ counterclockwise)</th><td id="cmp-angular"></td><td id="all-angular"></td></tr>
+          <tr><th scope="row">Path</th><td id="cmp-path" colspan="2"></td></tr>
         </tbody>
       </table>
     </div>
-    <div><a class="btn btn-primary" id="explore" href="cell.html">Explore cells in this cluster</a></div>
+    <div><a class="btn btn-primary" id="explore" href="export.html">Go to export</a></div>
   </section>
 </div>
 </main>

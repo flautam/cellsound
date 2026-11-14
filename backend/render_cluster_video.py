@@ -74,6 +74,7 @@ def render(
     summary_path: Path,
     out_path: Path,
     max_radius: float = 35.0,
+    fps: float | None = None,
 ) -> Path:
     motion = pd.read_csv(motion_path)
     clusters = pd.read_csv(clusters_path)
@@ -87,13 +88,17 @@ def render(
         raise ValueError(f"No frames in {video_path}")
 
     h, w = frames_rgb[0].shape[:2]
-    fps = 15.0
-    try:
-        meta_fps = iio.improps(video_path).fps
-        if meta_fps:
-            fps = float(meta_fps)
-    except Exception:
-        pass
+    out_fps = float(fps) if fps and float(fps) > 0 else 0.0
+    if out_fps <= 0:
+        try:
+            meta_fps = iio.improps(video_path).fps
+            if meta_fps:
+                out_fps = float(meta_fps)
+        except Exception:
+            out_fps = 0.0
+    if out_fps <= 0:
+        out_fps = 15.0
+    fps = out_fps
 
     cx_col = "centroid_x" if "centroid_x" in summary.columns else "mean_x"
     cy_col = "centroid_y" if "centroid_y" in summary.columns else "mean_y"
