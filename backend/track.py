@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 from cellpose import models
 from trackastra.model import Trackastra
 from trackastra.tracking.utils import graph_to_napari_tracks
@@ -19,6 +20,44 @@ from video import load_video
 # Project root is the folder that contains backend/ and output/.
 ROOT = Path(__file__).resolve().parent.parent
 TRACKS_PATH = ROOT / "output" / "tracks.csv"
+
+# Cellpose 4.2 ships cpsam, cpsam_v2, cpdino, and cpdino-vitb.
+# cpsam and cpsam_v2 are about 1.15 GB. cpdino is about the same size.
+# cpdino-vitb is about 328 MB, but it needs the dinov3 package, which is
+# not installed. cpsam_v2 is the model we can actually run.
+CELLPOSE_MODEL = "cpsam_v2"
+
+# A CPU box with 8 GB of RAM cannot segment a whole movie.
+CPU_FRAMES = 10
+CPU_CROP = 256
+CPU_BATCH_SIZE = 1
+
+
+def choose_device():
+    """Pick CUDA when it exists, otherwise the CPU. Prints the choice."""
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"Using device: {device.type}")
+    return device
+
+
+def limit_for_cpu(device_type, frames, crop):
+    """On CPU, use a short center crop when the user did not pass flags.
+
+    Returns frames, crop, and a note to print. The note is None when the
+    user already chose --frames and --crop, or when the device is not CPU.
+    """
+    if device_type == "cpu" and frames is None and crop is None:
+        return (
+            CPU_FRAMES,
+            CPU_CROP,
+            f"CPU default: first {CPU_FRAMES} frames and a {CPU_CROP} center crop.",
+        )
+    return frames, crop, None
 
 
 def center_crop(video, size):
@@ -33,17 +72,31 @@ def center_crop(video, size):
     return video[:, top : top + size, left : left + size]
 
 
-def segment_nuclei(video):
+def select_frames(video, frames, crop):
+    """Keep the requested frames and crop, then drop the rest of the movie."""
+    if frames is not None:
+        video = video[:frames]
+    video = center_crop(video, crop)
+    # A slice still points at the full movie. Copy just this region so the
+    # rest can be freed before segmentation.
+    return np.ascontiguousarray(video)
+
+
+def segment_nuclei(video, device):
     """Label nuclei in each frame with the pretrained Cellpose model.
 
     Returns an integer array of the same shape as video. 0 is background.
     Each frame is numbered on its own; Trackastra links those numbers later.
     """
-    model = models.CellposeModel(gpu=True)
-    # A list of 2D images makes Cellpose segment one frame at a time.
-    frames = [frame for frame in video]
-    masks, _flows, _styles = model.eval(frames)
-    return np.stack(masks).astype(np.int32)
+    model = models.CellposeModel(device=device, pretrained_model=CELLPOSE_MODEL)
+    # One tile at a time on CPU. A GPU can take the library's usual batch.
+    batch_size = CPU_BATCH_SIZE if device.type == "cpu" else 8
+    masks = np.empty(video.shape, dtype=np.int32)
+    for index in range(video.shape[0]):
+        # One frame, not a list of the whole video.
+        mask, _flows, _styles = model.eval(video[index], batch_size=batch_size)
+        masks[index] = mask
+    return masks
 
 
 def link_tracks(video, masks):
@@ -107,13 +160,13 @@ def main():
         "--frames",
         type=int,
         default=None,
-        help="Use only the first N frames (handy for a quick test)",
+        help="Use only the first N frames. On CPU, the default is 10.",
     )
     parser.add_argument(
         "--crop",
         type=int,
         default=None,
-        help="Center-crop every frame to this many pixels (handy for a quick test)",
+        help="Center-crop every frame to this many pixels. On CPU, the default is 256.",
     )
     args = parser.parse_args()
 
@@ -124,15 +177,16 @@ def main():
         print("--crop must be at least 1")
         sys.exit(1)
 
-    video = load_video(args.path)
-    if args.frames is not None:
-        video = video[: args.frames]
-    video = center_crop(video, args.crop)
+    device = choose_device()
+    frames, crop, note = limit_for_cpu(device.type, args.frames, args.crop)
+    if note:
+        print(note)
 
+    video = select_frames(load_video(args.path), frames, crop)
     frame_count, height, width = video.shape
     print(f"Tracking {frame_count} frames, {height}×{width}.")
 
-    masks = segment_nuclei(video)
+    masks = segment_nuclei(video, device)
     table = link_tracks(video, masks)
     save_tracks(table)
     report(table)
