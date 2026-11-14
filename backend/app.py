@@ -21,6 +21,7 @@ from uuid import uuid4
 import imageio.v3 as iio
 import numpy as np
 import pandas as pd
+from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -66,14 +67,18 @@ def _missing(job_id: str):
 
 
 def _preview_frame(frame):
-    """Turn a float microscope frame into an 8-bit image PNG can save."""
+    """Save the real first frame as an 8-bit picture the page can draw."""
     image = np.asarray(frame)
+    if image.ndim == 3 and image.shape[-1] in (3, 4):
+        image = image[..., :3]
     if np.issubdtype(image.dtype, np.floating):
+        image = image.astype(np.float32)
         peak = float(np.nanmax(image)) if image.size else 0.0
-        if peak <= 1.0:
+        # Movies stored as 0–1 would otherwise clip to a black thumbnail.
+        if peak <= 1.5:
             image = image * 255.0
         image = np.clip(np.rint(image), 0, 255).astype(np.uint8)
-    elif image.dtype != np.uint8:
+    else:
         image = np.clip(image, 0, 255).astype(np.uint8)
     return image
 
@@ -99,6 +104,16 @@ def _source_fps(video_path: Path) -> float:
     return 15.0
 
 
+def _source_preview(video_path: Path, fallback):
+    """Prefer the untouched first frame of the uploaded file."""
+    try:
+        if video_path.is_file():
+            return _preview_frame(iio.imread(video_path, index=0))
+    except Exception:
+        pass
+    return _preview_frame(fallback)
+
+
 def _track(job_id: str, video_path: Path) -> None:
     try:
         device = choose_device()
@@ -113,6 +128,7 @@ def _track(job_id: str, video_path: Path) -> None:
         )
         video = select_frames(load_video(video_path, max_frames=frame_limit), None, crop)
         total, height, width = (int(video.shape[0]), int(video.shape[1]), int(video.shape[2]))
+        Image.fromarray(_source_preview(video_path, video[0])).save(_job_dir(job_id) / "frame0.png")
         _write_meta(
             job_id,
             stage="tracking",
@@ -131,8 +147,8 @@ def _track(job_id: str, video_path: Path) -> None:
         table = link_tracks(video, masks)
         folder = _job_dir(job_id)
         table.to_csv(folder / "tracks.csv", index=False)
-        iio.imwrite(folder / "frame0.png", _preview_frame(video[0]))
         # Save the exact frames used for tracking so cluster overlays match.
+        # frame0.png stays the untouched upload frame written above.
         try:
             import cv2
 
@@ -230,7 +246,7 @@ def frame0_png(job_id: str):
     path = _job_dir(job_id) / "frame0.png"
     if not path.exists():
         return JSONResponse(status_code=404, content={"error": "not_ready", "message": "The first frame is not ready yet."})
-    return FileResponse(path, media_type="image/png")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/jobs/{job_id}/frame0")

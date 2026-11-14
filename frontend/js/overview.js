@@ -124,7 +124,7 @@ function begin() {
     }
   });
   setPlaying(true);
-  say("Playing the overview recording from " + positionWords() + ".");
+    say("Playing the overview. Each cluster uses its own instrument, from " + positionWords() + ".");
   clearInterval(timer);
   timer = setInterval(followRecording, 200);
 }
@@ -397,6 +397,9 @@ const jobId = currentJobId() || "a1b2c3";
 Promise.all([getSummary(jobId), getTraces(jobId)]).then(function (results) {
   summary = results[0];
   traces = results[1];
+  function byClusterId(a, b) { return Number(a.cluster_id) - Number(b.cluster_id); }
+  if (summary.clusters) summary.clusters = summary.clusters.slice().sort(byClusterId);
+  if (traces.clusters) traces.clusters = traces.clusters.slice().sort(byClusterId);
   fillSummary();
   fillLegend();
   drawTraces();

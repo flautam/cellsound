@@ -169,6 +169,11 @@ if (pauseButton) {
 
 getSummary(currentJobId() || "a1b2c3").then(function (data) {
   summary = data;
+  if (summary.clusters) {
+    summary.clusters = summary.clusters.slice().sort(function (a, b) {
+      return Number(a.cluster_id) - Number(b.cluster_id);
+    });
+  }
   const count = data.population ? data.population.n_clusters : 0;
   if (count) audioNote.textContent = "Overview plus one file for each of the " + count + " clusters.";
 }).catch(function () {

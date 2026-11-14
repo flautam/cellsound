@@ -54,16 +54,16 @@ The frontend counts "cells within 50 pixels" itself from `cells`.
 ```json
 {
   "poa": { "x": 256, "y": 256 },
-  "pitch_mode": "radial",
   "n_clusters": 5,
   "position_weight": 0.5,
-  "volume_levels": { "closest": 100, "middle": 50, "farthest": 25 },
-  "reverse_volume": false,
   "instruments": { "1": "piano", "2": "marimba", "3": "cello", "4": "flute", "5": "bell" }
 }
 ```
-`pitch_mode`: `radial | angular | speed`. `position_weight`: 0 = velocity only, 1 = position only.
-Response: `{ "status": "running" }`, then poll endpoint 2 until `status` is `done`.
+The server reads `poa`, `n_clusters` (default 5), `position_weight` (default 0.5), and `instruments`. `position_weight`: 0 = velocity only, 1 = position only.
+
+Pitch, volume, and the beat are fixed. Pitch follows radial velocity (higher when cells move toward the Point of Audio). Volume follows closeness. The beat follows speed. The body does not include `pitch_mode`, `volume_levels`, or `reverse_volume`.
+
+Response: `{ "status": "done" }`.
 
 ## 5. Results: `GET /api/jobs/{job_id}/summary`
 ```json

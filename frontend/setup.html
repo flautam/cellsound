@@ -136,12 +136,11 @@
   <section class="card" aria-labelledby="set-h">
     <h2 id="set-h">Analysis settings</h2>
     <div class="split">
-      <fieldset class="panel panel-lilac">
-        <legend class="panel-title">What should pitch follow?</legend>
-        <label class="choice"><input type="radio" name="pitch" value="radial" checked><span><strong>Toward or away (radial velocity)</strong><br>Pitch rises as cells move toward the Point of Audio.</span></label>
-        <label class="choice"><input type="radio" name="pitch" value="angular"><span><strong>Circling (angular velocity)</strong><br>Pitch rises for counterclockwise motion around it.</span></label>
-        <label class="choice"><input type="radio" name="pitch" value="speed"><span><strong>Speed only</strong><br>Pitch follows how fast cells move, in any direction.</span></label>
-      </fieldset>
+      <div class="panel panel-lilac">
+        <h3 class="panel-title">Pitch and volume</h3>
+        <p>Pitch follows direction. Cells moving toward the Point of Audio sound higher. Cells moving away sound lower.</p>
+        <p class="hint">Volume follows closeness. Cells nearer the Point of Audio are louder. Speed changes the beat, not the pitch.</p>
+      </div>
       <div class="panel panel-mint">
         <label class="panel-title" for="clusters">Number of clusters</label>
         <p id="k-hint" class="hint">Chunks are spatial neighborhoods (fixed-radius circles around each chunk center). More clusters means more neighborhoods across the field.</p>
@@ -150,31 +149,6 @@
         <div class="ends" aria-hidden="true"><span>2</span><span>10</span></div>
       </div>
     </div>
-    <fieldset class="panel panel-sky">
-      <legend class="panel-title">Volume level by distance</legend>
-      <p class="hint">Cells are split into thirds by how far they are from the Point of Audio. Set a volume level for each third.</p>
-      <div class="vol-row">
-        <div class="vol-card">
-          <label for="vol-near">Closest third<span class="sr"> volume level</span></label>
-          <p class="big-num" aria-hidden="true"><span id="near-num">100</span>%</p>
-          <input id="vol-near" type="range" min="0" max="100" step="5" value="100" aria-valuetext="Closest third volume level, 100 percent">
-          <p class="hint">Cells nearest the Point of Audio.</p>
-        </div>
-        <div class="vol-card">
-          <label for="vol-mid">Middle third<span class="sr"> volume level</span></label>
-          <p class="big-num" aria-hidden="true"><span id="mid-num">50</span>%</p>
-          <input id="vol-mid" type="range" min="0" max="100" step="5" value="50" aria-valuetext="Middle third volume level, 50 percent">
-          <p class="hint">Cells at a medium distance.</p>
-        </div>
-        <div class="vol-card">
-          <label for="vol-far">Farthest third<span class="sr"> volume level</span></label>
-          <p class="big-num" aria-hidden="true"><span id="far-num">25</span>%</p>
-          <input id="vol-far" type="range" min="0" max="100" step="5" value="25" aria-valuetext="Farthest third volume level, 25 percent">
-          <p class="hint">Low levels also sound muffled.</p>
-        </div>
-      </div>
-      <label class="choice"><input type="checkbox" id="reverse"><span><strong>Reverse</strong>: make far cells louder (swaps the closest and farthest levels)</span></label>
-    </fieldset>
     <p id="run-error" class="error" hidden></p>
     <div class="flow">
       <button type="button" class="btn btn-primary" id="run">Run analysis</button>

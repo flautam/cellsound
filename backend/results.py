@@ -145,8 +145,11 @@ def build_analysis(tracks: pd.DataFrame, settings: dict, width: int, height: int
         for cluster_id, group in cells.groupby("cluster_id"):
             mean_radial = float(group["radial_v"].mean())
             scored.append((abs(mean_radial - population_radial), int(cluster_id), group, mean_radial))
-        scored.sort(key=lambda item: item[0])
-        for rank, (_gap, cluster_id, group, mean_radial) in enumerate(scored, start=1):
+        # 1 is closest to the population mean radial velocity (most typical).
+        # The highest number is farthest from it. Ties keep the lower original id.
+        scored.sort(key=lambda item: (item[0], item[1]))
+        for rank, (_gap, _old_id, group, mean_radial) in enumerate(scored, start=1):
+            cluster_id = rank
             mean_speed = float(group["speed"].mean())
             mean_angular = float(group["angular_v"].mean())
             shown_speed = speed_of(mean_speed)

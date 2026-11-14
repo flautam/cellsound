@@ -11,10 +11,6 @@ const stepSelect = document.getElementById("step");
 const xInput = document.getElementById("px-x");
 const yInput = document.getElementById("px-y");
 const clusterSlider = document.getElementById("clusters");
-const nearSlider = document.getElementById("vol-near");
-const midSlider = document.getElementById("vol-mid");
-const farSlider = document.getElementById("vol-far");
-const reverseBox = document.getElementById("reverse");
 const runError = document.getElementById("run-error");
 
 let frame = { width: 512, height: 512, cells: [], imageUrl: "" };
@@ -126,12 +122,6 @@ function scheduleMove() {
 function refreshSliders() {
   clusterSlider.setAttribute("aria-valuetext", clusterSlider.value + " clusters");
   document.getElementById("cluster-num").textContent = clusterSlider.value;
-  nearSlider.setAttribute("aria-valuetext", "Closest third volume level, " + nearSlider.value + " percent");
-  midSlider.setAttribute("aria-valuetext", "Middle third volume level, " + midSlider.value + " percent");
-  farSlider.setAttribute("aria-valuetext", "Farthest third volume level, " + farSlider.value + " percent");
-  document.getElementById("near-num").textContent = nearSlider.value;
-  document.getElementById("mid-num").textContent = midSlider.value;
-  document.getElementById("far-num").textContent = farSlider.value;
 }
 
 function analysisBody() {
@@ -142,14 +132,7 @@ function analysisBody() {
   }
   return {
     poa: { x: poa.x, y: poa.y },
-    pitch_mode: document.querySelector('input[name="pitch"]:checked').value,
     n_clusters: count,
-    volume_levels: {
-      closest: Number(nearSlider.value),
-      middle: Number(midSlider.value),
-      farthest: Number(farSlider.value)
-    },
-    reverse_volume: reverseBox.checked,
     instruments: instruments
   };
 }
@@ -193,25 +176,12 @@ stepSelect.addEventListener("change", function () {
 
 xInput.addEventListener("input", scheduleMove);
 yInput.addEventListener("input", scheduleMove);
-[clusterSlider, nearSlider, midSlider, farSlider].forEach(function (slider) {
+[clusterSlider].forEach(function (slider) {
   slider.addEventListener("input", refreshSliders);
 });
 
-reverseBox.addEventListener("change", function () {
-  const closest = nearSlider.value;
-  nearSlider.value = farSlider.value;
-  farSlider.value = closest;
-  refreshSliders();
-  say((reverseBox.checked ? "Reversed. " : "Back to normal. ") + "Closest third " + nearSlider.value + " percent, middle " + midSlider.value + " percent, farthest " + farSlider.value + " percent.");
-});
-
 document.getElementById("reset").addEventListener("click", function () {
-  document.querySelector('input[name="pitch"][value="radial"]').checked = true;
   clusterSlider.value = "8";
-  nearSlider.value = "100";
-  midSlider.value = "50";
-  farSlider.value = "25";
-  reverseBox.checked = false;
   stepSelect.value = "32";
   xInput.step = "32";
   yInput.step = "32";

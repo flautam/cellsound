@@ -241,7 +241,11 @@ window.addEventListener("pagehide", function () {
 
 getSummary(currentJobId() || "a1b2c3").then(function (data) {
   summary = data;
-  clusters = (data.clusters || []).slice().sort(function (a, b) { return a.rank - b.rank; });
+  clusters = (data.clusters || []).slice().sort(function (a, b) {
+    const rankDelta = Number(a.rank) - Number(b.rank);
+    if (rankDelta) return rankDelta;
+    return Number(a.cluster_id) - Number(b.cluster_id);
+  });
   document.getElementById("page-title").textContent = "Explore the " + clusters.length + " chunks";
   if (!clusters.length) {
     say("No cells were tracked, so there are no chunks to explore.");
