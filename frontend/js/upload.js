@@ -34,21 +34,21 @@ function clearFileError() {
   videoInput.setAttribute("aria-describedby", "video-hint");
 }
 
-function isMp4(file) {
+function isVideo(file) {
   const name = file.name.toLowerCase();
-  return name.endsWith(".mp4") || file.type === "video/mp4";
+  return name.endsWith(".mp4") || name.endsWith(".mov") || file.type === "video/mp4" || file.type === "video/quicktime";
 }
 
 function takeFile(file) {
   chosenFile = null;
   if (!file) {
     fileName.textContent = "No file chosen";
-    showFileError("Choose an MP4 video first.");
+    showFileError("Choose an MP4 or MOV video first.");
     return;
   }
   fileName.textContent = file.name;
-  if (!isMp4(file)) {
-    showFileError("That file is not an MP4 video.");
+  if (!isVideo(file)) {
+    showFileError("That file is not an MP4 or MOV video.");
     return;
   }
   if (file.size > MAX_BYTES) {
@@ -103,6 +103,13 @@ function say(text) {
 }
 
 function showProgress(data) {
+  if (data.status === "error") {
+    setCheck("check-received", "Done", "done");
+    setCheck("check-track", "Stopped", "");
+    continueLink.hidden = true;
+    say(data.message || "Tracking stopped because of an error.");
+    return;
+  }
   const total = data.total_frames || 200;
   const frame = Math.min(data.frame || 0, total);
   const done = data.status === "done";
@@ -171,7 +178,7 @@ drop.addEventListener("drop", function (event) {
 
 startButton.addEventListener("click", function () {
   if (!chosenFile) {
-    showFileError("Choose an MP4 video first.");
+    showFileError("Choose an MP4 or MOV video first.");
     return;
   }
   const calibration = readCalibration();

@@ -34,17 +34,17 @@ body{overflow-x:hidden}
   justify-content:space-between;
   gap:0.7em 1.4em;
 }
-.brand{
-  color:var(--on-header);
+.app a.brand{
+  color:#fff;
   text-decoration:none;
   display:flex;
   align-items:center;
-  gap:0.6em;
+  gap:0.45em;
   font-weight:700;
   font-size:1.15em;
   min-height:2.4em;
 }
-.brand svg{width:2em;height:2em;flex:none}
+.brand-logo{width:2.15em;height:2em;flex:none;object-fit:contain;display:block}
 .header-tools{display:flex;flex-wrap:wrap;align-items:center;gap:0.6em 1.2em}
 .display-wrap{position:relative}
 .hdr-btn{
@@ -129,10 +129,11 @@ body{overflow-x:hidden}
 }
 .steps ol{
   list-style:none;
-  margin:0;
+  margin:0 auto;
   padding:0;
   display:flex;
   flex-wrap:wrap;
+  justify-content:center;
   gap:0.5em;
 }
 .step-link{
@@ -207,17 +208,6 @@ body{overflow-x:hidden}
 }
 .page h2{margin-top:0}
 .live{min-height:1.2em}
-.brand-mark{
-  width:2em;
-  height:2em;
-  border-radius:50%;
-  background:var(--sun);
-  color:var(--on-sun);
-  display:grid;
-  place-items:center;
-  flex:none;
-}
-.brand-mark svg{width:1.15em;height:1.15em}
 
 .hero-bar,.row{display:flex;flex-wrap:wrap;align-items:center;gap:0.7em}
 .hero-bar{justify-content:space-between}
@@ -346,7 +336,7 @@ body{overflow-x:hidden}
 .split{display:flex;flex-wrap:wrap;gap:1.6em;align-items:stretch}
 .split > *{flex:1 1 18em;min-width:0}
 .preview-wrap{max-width:24em}
-.preview{width:100%;aspect-ratio:1/1;height:auto;display:block;background:var(--header);border:3px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0}
+.preview{width:100%;height:auto;display:block;background:var(--header);border:3px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0}
 .readout{border:3px solid var(--line);border-radius:0 0 4px 4px;background:var(--mint);padding:0.9em 1em;display:flex;flex-direction:column;gap:0.4em}
 .readout p{margin:0}
 .legend{display:flex;align-items:center;gap:0.5em;font-size:0.9em}

@@ -23,6 +23,7 @@ let summary = null;
 let traces = null;
 let totalFrames = 200;
 let totalMinutes = 1000;
+let timed = false;
 let frame = 0;
 let playing = false;
 let timer = null;
@@ -42,6 +43,7 @@ function clock(minutes) {
 }
 
 function positionWords() {
+  if (!timed) return "frame " + frame + " of " + totalFrames;
   const at = totalFrames ? (frame / totalFrames) * totalMinutes : 0;
   return clock(at) + " of " + clock(totalMinutes);
 }
@@ -132,30 +134,54 @@ function ns(name) {
 }
 
 function drawTraces() {
+  const svg = document.getElementById("traces");
   const paths = document.getElementById("trace-paths");
   const marker = document.getElementById("trace-poa");
   const title = document.getElementById("trace-title");
   const show = document.getElementById("trace-show").value;
+  const width = traces.width || 512;
+  const height = traces.height || 512;
+  const scale = Math.min(width, height) / 512;
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.style.aspectRatio = width + " / " + height;
+  const backdrop = document.getElementById("trace-backdrop");
+  backdrop.setAttribute("width", String(width));
+  backdrop.setAttribute("height", String(height));
+  const image = document.getElementById("trace-image");
+  const imageUrl = traces.image_url || frameImageUrl(jobId);
+  image.setAttribute("width", String(width));
+  image.setAttribute("height", String(height));
+  image.setAttribute("href", imageUrl);
+  image.setAttributeNS("http://www.w3.org/1999/xlink", "href", imageUrl);
   paths.replaceChildren();
   traces.clusters.forEach(function (cluster) {
     const group = ns("g");
     const selected = show === "all" || show === String(cluster.cluster_id);
     group.setAttribute("opacity", selected ? "1" : "0.12");
     (cluster.paths || []).forEach(function (path) {
+      const points = path.map(function (point) { return point[0] + "," + point[1]; }).join(" ");
+      const halo = ns("polyline");
+      halo.setAttribute("points", points);
+      halo.setAttribute("fill", "none");
+      halo.setAttribute("stroke", "var(--on-header)");
+      halo.setAttribute("stroke-width", String(8 * scale));
+      halo.setAttribute("stroke-linecap", "round");
+      halo.setAttribute("stroke-linejoin", "round");
       const line = ns("polyline");
-      line.setAttribute("points", path.map(function (point) { return point[0] + "," + point[1]; }).join(" "));
+      line.setAttribute("points", points);
       line.setAttribute("fill", "none");
       line.setAttribute("stroke", cluster.color);
-      line.setAttribute("stroke-width", "4");
+      line.setAttribute("stroke-width", String(4 * scale));
       line.setAttribute("stroke-linecap", "round");
       line.setAttribute("stroke-linejoin", "round");
+      group.appendChild(halo);
       group.appendChild(line);
     });
     paths.appendChild(group);
   });
   const poa = traces.poa || { x: 256, y: 256 };
   marker.replaceChildren();
-  marker.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ")");
+  marker.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ") scale(" + scale + ")");
   [
     ["circle", { r: "22", stroke: "var(--on-header)", "stroke-width": "8" }],
     ["circle", { r: "22", stroke: "var(--danger)", "stroke-width": "4" }],
@@ -208,10 +234,14 @@ function fillSummary() {
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem("cellsound-calibration") || "null"); } catch (error) { saved = null; }
   const minutes = saved && saved.minutes_per_frame ? Number(saved.minutes_per_frame) : 0;
+  timed = minutes > 0;
   totalMinutes = pop.duration_min;
-  totalFrames = minutes > 0 ? Math.round(pop.duration_min / minutes) : pop.duration_min;
+  totalFrames = timed ? Math.round(pop.duration_min / minutes) : pop.duration_min;
   const about = Math.floor(pop.duration_min / 60);
-  document.getElementById("hero-lede").textContent = pop.n_cells + " cells over " + totalFrames + " frames, about " + about + " hours. Listen first, then read the plain-language summary below.";
+  const length = timed
+    ? pop.n_cells + " cells over " + totalFrames + " frames, about " + about + " hours."
+    : pop.n_cells + " cells over " + totalFrames + " frames. No time calibration was saved, so the timeline is in frames.";
+  document.getElementById("hero-lede").textContent = length + " Listen first, then read the plain-language summary below.";
   document.getElementById("desc-text").textContent = pop.description;
   const mainCount = Math.round(pop.n_cells * pop.pct_main_pattern / 100);
   const unusual = summary.clusters.some(function (cluster) { return cluster.unusual; });

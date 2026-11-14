@@ -66,6 +66,19 @@ def _missing(job_id: str):
     return None
 
 
+def _preview_frame(frame):
+    """Turn a float microscope frame into an 8-bit image PNG can save."""
+    image = np.asarray(frame)
+    if np.issubdtype(image.dtype, np.floating):
+        peak = float(np.nanmax(image)) if image.size else 0.0
+        if peak <= 1.0:
+            image = image * 255.0
+        image = np.clip(np.rint(image), 0, 255).astype(np.uint8)
+    elif image.dtype != np.uint8:
+        image = np.clip(image, 0, 255).astype(np.uint8)
+    return image
+
+
 def _track(job_id: str, video_path: Path) -> None:
     try:
         device = choose_device()
@@ -90,7 +103,7 @@ def _track(job_id: str, video_path: Path) -> None:
         table = link_tracks(video, masks)
         folder = _job_dir(job_id)
         table.to_csv(folder / "tracks.csv", index=False)
-        iio.imwrite(folder / "frame0.png", np.asarray(video[0]))
+        iio.imwrite(folder / "frame0.png", _preview_frame(video[0]))
         _write_meta(
             job_id,
             status="done",
@@ -121,15 +134,20 @@ async def create_job(
     minutes_per_frame: float | None = Form(None),
 ):
     name = (video.filename or "").lower()
-    if not name.endswith(".mp4") and video.content_type not in {"video/mp4", "application/mp4"}:
-        return JSONResponse(status_code=400, content={"error": "not_mp4", "message": "That file is not an MP4 video."})
+    if name.endswith(".mov") or video.content_type == "video/quicktime":
+        suffix = ".mov"
+    elif name.endswith(".mp4") or video.content_type in {"video/mp4", "application/mp4"}:
+        suffix = ".mp4"
+    else:
+        return JSONResponse(status_code=400, content={"error": "not_mp4", "message": "That file is not an MP4 or MOV video."})
     payload = await video.read()
     if len(payload) > MAX_BYTES:
         return JSONResponse(status_code=413, content={"error": "too_large", "message": "The video is larger than 100 MB."})
     job_id = uuid4().hex[:6]
     folder = _job_dir(job_id)
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "video.mp4").write_bytes(payload)
+    video_path = folder / f"video{suffix}"
+    video_path.write_bytes(payload)
     _write_meta(
         job_id,
         status="queued",
@@ -142,7 +160,7 @@ async def create_job(
         width=0,
         height=0,
     )
-    threading.Thread(target=_track, args=(job_id, folder / "video.mp4"), daemon=True).start()
+    threading.Thread(target=_track, args=(job_id, video_path), daemon=True).start()
     return {"job_id": job_id}
 
 
@@ -211,6 +229,7 @@ def analyze(job_id: str, body: dict):
         _write_meta(job_id, status="error", message=str(exc) or "The analysis could not finish.")
         return JSONResponse(status_code=500, content={"error": "analysis_failed", "message": str(exc)})
     folder = _job_dir(job_id)
+    traces["image_url"] = f"/api/jobs/{job_id}/frame0.png"
     (folder / "summary.json").write_text(json.dumps(summary))
     (folder / "traces.json").write_text(json.dumps(traces))
     (folder / "settings.json").write_text(json.dumps(body))
@@ -243,7 +262,9 @@ def traces(job_id: str):
     path = _job_dir(job_id) / "traces.json"
     if not path.exists():
         return JSONResponse(status_code=404, content={"error": "not_ready", "message": "Run the analysis before opening the traces."})
-    return json.loads(path.read_text())
+    data = json.loads(path.read_text())
+    data["image_url"] = f"/api/jobs/{job_id}/frame0.png"
+    return data
 
 
 @app.get("/api/jobs/{job_id}/audio/{name}.wav")

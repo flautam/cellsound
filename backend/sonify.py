@@ -38,18 +38,24 @@ def _columns(motion: pd.DataFrame, cell_ids):
     for _frame, group in table.groupby("frame"):
         steps = group.dropna(subset=["radial_v"])
         use = steps if not steps.empty else group
-        radial.append(float(use["radial_v"].mean()))
-        speed.append(float(use["speed"].mean()) if "speed" in use else 0.0)
-        dist.append(float(use["dist_poa"].mean()) if "dist_poa" in use else 0.0)
-        xs.append(float(group["x"].mean()))
+        radial.append(_mean(use["radial_v"]))
+        speed.append(_mean(use["speed"]) if "speed" in use else 0.0)
+        dist.append(_mean(use["dist_poa"]) if "dist_poa" in use else 0.0)
+        xs.append(_mean(group["x"]))
     return np.array(radial), np.array(speed), np.array(dist), np.array(xs)
 
 
+def _mean(series):
+    numbers = pd.to_numeric(series, errors="coerce").dropna()
+    return float(numbers.mean()) if not numbers.empty else 0.0
+
+
 def _stretch(values, count):
-    if len(values) == 1:
-        return np.full(count, float(values[0]))
-    source = np.linspace(0, 1, len(values))
-    return np.interp(np.linspace(0, 1, count), source, values)
+    clean = np.nan_to_num(np.asarray(values, dtype=float), nan=0.0)
+    if len(clean) == 1:
+        return np.full(count, float(clean[0]))
+    source = np.linspace(0, 1, len(clean))
+    return np.interp(np.linspace(0, 1, count), source, clean)
 
 
 def _render(freq, amp, pulse_hz, pan, harmonics):
@@ -60,10 +66,12 @@ def _render(freq, amp, pulse_hz, pan, harmonics):
         tone += weight * np.sin(2 * np.pi * carrier * multiple)
     peak = float(np.max(np.abs(tone)) or 1)
     pulse = 0.3 + 0.7 * np.power(np.maximum(0, np.sin(2 * np.pi * np.cumsum(pulse_hz) / RATE)), 6)
-    mono = (amp * pulse * tone / peak).astype(np.float32)
+    mono = amp * pulse * tone / peak
     left = np.sqrt(np.clip((1 - pan) / 2, 0, 1))
     right = np.sqrt(np.clip((1 + pan) / 2, 0, 1))
-    return np.column_stack([mono * left, mono * right]).astype(np.float32)
+    wave = np.column_stack([mono * left, mono * right])
+    loudest = float(np.max(np.abs(wave)) or 1.0)
+    return (wave / loudest * 0.85).astype(np.float32)
 
 
 def _from_motion(radial, speed, dist, xs, poa_x, span, harmonics, seconds):

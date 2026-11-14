@@ -80,6 +80,10 @@ function downloadExport(jobId, include) {
   });
 }
 
+function frameImageUrl(jobId) {
+  return "/api/jobs/" + encodeURIComponent(jobId) + "/frame0.png";
+}
+
 function audioUrl(jobId, name) {
   const file = String(name || "").replace(/\.wav$/, "");
   return "/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav";

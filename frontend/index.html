@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Start: upload a video — Cell Migration Sonification</title>
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="img/logo.png" type="image/png">
 </head>
 <body class="app theme-light size-1" data-step="1">
 <a class="skip" href="#main">Skip to main content</a>
 <header class="site-header">
-  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 10v4M6 7v10M10 4v16M14 8v8M18 6v12M22 10v4"></path></svg></span>cellsound</a>
+  <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" alt="" width="28" height="26">cellsound</a>
   <div class="header-tools">
     <div class="display-wrap">
       <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
@@ -87,7 +88,7 @@
       <div>
         <h2>How it works, in 5 steps</h2>
         <ol class="mini-steps">
-          <li class="mini-step here"><span class="mini-top" aria-hidden="true"><span class="mini-num">1</span></span><strong>Upload</strong><span>Add your MP4</span><span class="here-tag">You are here</span></li>
+          <li class="mini-step here"><span class="mini-top" aria-hidden="true"><span class="mini-num">1</span></span><strong>Upload</strong><span>Add your MP4 or MOV</span><span class="here-tag">You are here</span></li>
           <li class="mini-step tint-2"><span class="mini-top" aria-hidden="true"><span class="mini-num">2</span></span><strong>Point of Audio</strong><span>Choose where to listen</span></li>
           <li class="mini-step tint-3"><span class="mini-top" aria-hidden="true"><span class="mini-num">3</span></span><strong>Overview</strong><span>Hear every cell</span></li>
           <li class="mini-step tint-4"><span class="mini-top" aria-hidden="true"><span class="mini-num">4</span></span><strong>Clusters</strong><span>Hear each group</span></li>
@@ -117,11 +118,11 @@
     <h2 id="choose-h" tabindex="-1">Step 1: Choose your video</h2>
     <div class="drop" id="drop">
       <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>
-      <label id="video-label" class="drop-title" for="video">Video file (MP4)</label>
-      <input id="video" class="sr file-in" type="file" accept="video/mp4,.mp4" aria-labelledby="video-label" aria-describedby="video-hint">
+      <label id="video-label" class="drop-title" for="video">Video file (MP4 or MOV)</label>
+      <input id="video" class="sr file-in" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" aria-labelledby="video-label" aria-describedby="video-hint">
       <label for="video" class="file-btn" aria-hidden="true">Choose file</label>
       <p id="file-name" class="file-name" aria-hidden="true">No file chosen</p>
-      <p id="video-hint" class="hint">MP4 format, up to 100MB. You can also drag a file onto this box.</p>
+      <p id="video-hint" class="hint">MP4 or MOV, up to 100MB. You can also drag a file onto this box.</p>
       <p id="video-error" class="error" hidden></p>
     </div>
     <fieldset class="fields">
@@ -156,7 +157,7 @@
     </ol>
     <div class="status-box">
       <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
-      <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Press Start processing after you choose an MP4. We will announce each quarter.</p>
+      <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Press Start processing after you choose an MP4 or MOV. We will announce each quarter.</p>
     </div>
     <div><a class="btn btn-primary" id="continue" href="setup.html" hidden>Continue to Point of Audio</a></div>
   </section>

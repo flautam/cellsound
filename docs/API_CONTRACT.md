@@ -20,12 +20,12 @@ Key idea: **tracking runs once per video** (slow, GPU). Everything after it (mot
 ---
 
 ## 1. Upload a video: `POST /api/jobs`
-`multipart/form-data`: `video` (MP4, max 100 MB), `pixel_size_um` (optional number), `minutes_per_frame` (optional number).
+`multipart/form-data`: `video` (MP4 or MOV, max 100 MB), `pixel_size_um` (optional number), `minutes_per_frame` (optional number).
 
 ```json
 { "job_id": "a1b2c3" }
 ```
-Errors: `400 { "error": "not_mp4", "message": "That file is not an MP4 video." }`, `413 { "error": "too_large", "message": "The video is larger than 100 MB." }`
+Errors: `400 { "error": "not_mp4", "message": "That file is not an MP4 or MOV video." }`, `413 { "error": "too_large", "message": "The video is larger than 100 MB." }`
 
 ## 2. Progress: `GET /api/jobs/{job_id}`
 ```json

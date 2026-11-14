@@ -80,55 +80,89 @@ function scheduleTone(when, frequency, panValue, duration) {
 function playRecording(url, options) {
   const settings = options || {};
   stopAllSound(true);
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  const ratio = settings.ratio || 0;
+  const ctx = audioContext();
+  const gain = ctx.createGain();
+  gain.gain.value = Math.max(0.0001, appVolume);
+  gain.connect(ctx.destination);
+  let buffer = null;
+  let source = null;
+  let rate = settings.rate || 1;
+  let offset = 0;
+  let startedAt = 0;
+  let alive = true;
+  let boost = 1;
 
   function applyVolume() {
-    audio.volume = Math.max(0, Math.min(1, appVolume));
+    gain.gain.value = Math.max(0.0001, appVolume * boost);
   }
 
-  audio.addEventListener("loadedmetadata", function () {
-    applyVolume();
-    audio.playbackRate = settings.rate || 1;
-    if (ratio > 0 && audio.duration) {
-      audio.currentTime = Math.min(audio.duration * ratio, Math.max(0, audio.duration - 0.05));
+  function begin(at) {
+    if (!buffer || !alive) return;
+    if (source) {
+      source.onended = null;
+      try { source.stop(); } catch (error) { /* already stopped */ }
     }
-  });
-  audio.addEventListener("error", function () {
-    if (settings.onError) settings.onError();
-  });
-  audio.addEventListener("ended", function () {
-    activeSounds.delete(stop);
-    if (settings.onEnded) settings.onEnded();
-  });
+    offset = Math.max(0, Math.min(buffer.duration - 0.05, at || 0));
+    source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    source.connect(gain);
+    source.onended = function () {
+      if (!alive) return;
+      alive = false;
+      activeSounds.delete(stop);
+      if (settings.onEnded) settings.onEnded();
+    };
+    source.start(0, offset);
+    startedAt = ctx.currentTime;
+  }
 
   function stop() {
-    audio.pause();
+    alive = false;
+    if (!source) return;
+    source.onended = null;
+    try { source.stop(); } catch (error) { /* already stopped */ }
   }
 
   activeSounds.add(stop);
-  const started = audio.play();
-  if (started && started.catch) {
-    started.catch(function () {
-      if (settings.onError) settings.onError();
-    });
-  }
+  fetch(url).then(function (response) {
+    if (!response.ok) throw new Error("missing");
+    return response.arrayBuffer();
+  }).then(function (bytes) {
+    return ctx.decodeAudioData(bytes);
+  }).then(function (decoded) {
+    const samples = decoded.getChannelData(0);
+    let peak = 0;
+    for (let index = 0; index < samples.length; index += 16) {
+      peak = Math.max(peak, Math.abs(samples[index]));
+    }
+    boost = peak > 0.01 ? Math.min(6, 0.85 / peak) : 1;
+    applyVolume();
+    buffer = decoded;
+    begin((settings.ratio || 0) * buffer.duration);
+  }).catch(function () {
+    if (settings.onError) settings.onError();
+  });
+
   return {
     setVolume: applyVolume,
-    setRate: function (rate) {
-      audio.playbackRate = rate || 1;
+    setRate: function (next) {
+      rate = next || 1;
+      if (source) source.playbackRate.value = rate;
     },
     seekRatio: function (next) {
-      if (!audio.duration) return;
-      audio.currentTime = Math.max(0, Math.min(0.999, next)) * audio.duration;
+      if (!buffer) return;
+      const place = Math.max(0, Math.min(0.999, next)) * buffer.duration;
+      if (alive) begin(place);
+      else offset = place;
     },
     ready: function () {
-      return Boolean(audio.duration);
+      return Boolean(buffer);
     },
     currentRatio: function () {
-      if (!audio.duration) return 0;
-      return audio.currentTime / audio.duration;
+      if (!buffer) return 0;
+      const played = source ? (ctx.currentTime - startedAt) * rate : 0;
+      return Math.min(1, (offset + Math.max(0, played)) / buffer.duration);
     }
   };
 }

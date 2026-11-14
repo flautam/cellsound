@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Population overview — Cell Migration Sonification</title>
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="img/logo.png" type="image/png">
 </head>
 <body class="app theme-light size-1" data-step="3">
 <a class="skip" href="#main">Skip to main content</a>
 <header class="site-header">
-  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 10v4M6 7v10M10 4v16M14 8v8M18 6v12M22 10v4"></path></svg></span>cellsound</a>
+  <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" alt="" width="28" height="26">cellsound</a>
   <div class="header-tools">
     <div class="display-wrap">
       <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
@@ -123,7 +124,8 @@
     <div class="split">
       <svg class="trace-svg" id="traces" role="img" aria-labelledby="trace-title" viewBox="0 0 512 512">
         <title id="trace-title">Cluster traces are loading.</title>
-        <rect width="512" height="512" fill="var(--header)"></rect>
+        <rect id="trace-backdrop" width="512" height="512" fill="var(--header)"></rect>
+        <image id="trace-image" x="0" y="0" width="512" height="512" preserveAspectRatio="none"></image>
         <g id="trace-paths"></g>
         <g id="trace-poa"></g>
       </svg>

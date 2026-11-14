@@ -19,7 +19,7 @@ const farSlider = document.getElementById("vol-far");
 const reverseBox = document.getElementById("reverse");
 const runError = document.getElementById("run-error");
 
-let frame = { width: 512, height: 512, cells: [] };
+let frame = { width: 512, height: 512, cells: [], imageUrl: "" };
 let poa = { x: 256, y: 256 };
 let announceTimer = null;
 
@@ -49,19 +49,41 @@ function clamp(value, max) {
   return Math.max(0, Math.min(max, Math.round(value)));
 }
 
+function markScale() {
+  return Math.min(frame.width, frame.height) / 512;
+}
+
+function fitPreview() {
+  const svg = document.getElementById("preview");
+  svg.setAttribute("viewBox", "0 0 " + frame.width + " " + frame.height);
+  svg.style.aspectRatio = frame.width + " / " + frame.height;
+  const backdrop = document.getElementById("frame-backdrop");
+  backdrop.setAttribute("width", String(frame.width));
+  backdrop.setAttribute("height", String(frame.height));
+  const image = document.getElementById("frame-image");
+  image.setAttribute("width", String(frame.width));
+  image.setAttribute("height", String(frame.height));
+  if (frame.imageUrl) {
+    image.setAttribute("href", frame.imageUrl);
+    image.setAttributeNS("http://www.w3.org/1999/xlink", "href", frame.imageUrl);
+  }
+}
+
 function draw() {
+  fitPreview();
+  const scale = markScale();
   cellDots.replaceChildren();
   frame.cells.forEach(function (cell, index) {
     const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     dot.setAttribute("cx", String(cell.x));
     dot.setAttribute("cy", String(cell.y));
-    dot.setAttribute("r", "8");
+    dot.setAttribute("r", String(8 * scale));
     dot.setAttribute("fill", FILLS[index % FILLS.length]);
     dot.setAttribute("stroke", "var(--ink)");
-    dot.setAttribute("stroke-width", "2");
+    dot.setAttribute("stroke-width", String(2 * scale));
     cellDots.appendChild(dot);
   });
-  crosshair.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ")");
+  crosshair.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ") scale(" + scale + ")");
   const where = placeWords(poa.x, poa.y);
   previewTitle.textContent = "First video frame with " + frame.cells.length + " cell nuclei. The Point of Audio is at the " + where + ", x " + poa.x + ", y " + poa.y + ".";
   document.getElementById("preview").setAttribute("aria-label", previewTitle.textContent);
@@ -260,7 +282,8 @@ getFrame0(jobId).then(function (data) {
   frame = {
     width: data.width || 512,
     height: data.height || 512,
-    cells: data.cells || []
+    cells: data.cells || [],
+    imageUrl: data.image_url || frameImageUrl(jobId)
   };
   xInput.max = String(frame.width);
   yInput.max = String(frame.height);
