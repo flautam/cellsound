@@ -1,0 +1,65 @@
+{
+  "units": { "speed": "µm/min", "angular": "rad/min" },
+  "population": {
+    "n_cells": 142,
+    "duration_min": 1000,
+    "mean_speed": 1.2,
+    "mean_radial_v": -0.6,
+    "mean_angular_v": 0.08,
+    "pct_main_pattern": 75,
+    "n_clusters": 5,
+    "description": "Most cells drift slowly toward the Point of Audio, averaging 1.2 µm per minute. They also turn gently counterclockwise around it. 75% of cells follow this pattern. We found 5 groups; one small group moves outward, which is unusual."
+  },
+  "reliability": {
+    "level": "good",
+    "note": "9 cells were lost for a few frames where nuclei overlapped, mostly near the top edge."
+  },
+  "clusters": [
+    {
+      "cluster_id": 1, "rank": 1, "name": "Steady inward drifters", "n_cells": 48,
+      "unusual": false, "instrument": "piano", "color": "#6E9BFF",
+      "mean_speed": 1.3, "mean_radial_v": -0.8, "mean_angular_v": 0.15,
+      "description": "The most typical group. These cells move steadily toward the Point of Audio and turn gently counterclockwise, just like the population as a whole.",
+      "audio": "cluster_1.wav", "cell_ids": [12, 27, 31]
+    },
+    {
+      "cluster_id": 2, "rank": 2, "name": "Fast circlers", "n_cells": 31,
+      "unusual": false, "instrument": "marimba", "color": "#3FD1C9",
+      "mean_speed": 2.1, "mean_radial_v": -0.1, "mean_angular_v": 0.4,
+      "description": "The fastest group. They mostly circle counterclockwise around the Point of Audio and come closer only slowly.",
+      "audio": "cluster_2.wav", "cell_ids": [44]
+    },
+    {
+      "cluster_id": 3, "rank": 3, "name": "Slow edge cells", "n_cells": 28,
+      "unusual": false, "instrument": "cello", "color": "#B79BFF",
+      "mean_speed": 0.4, "mean_radial_v": -0.05, "mean_angular_v": 0.02,
+      "description": "Cells near the edge of the dish. They move slowly and only slightly inward.",
+      "audio": "cluster_3.wav", "cell_ids": [43]
+    },
+    {
+      "cluster_id": 4, "rank": 4, "name": "Near-center pausers", "n_cells": 20,
+      "unusual": false, "instrument": "flute", "color": "#F2A93B",
+      "mean_speed": 0.3, "mean_radial_v": -0.02, "mean_angular_v": 0.01,
+      "description": "Cells already close to the Point of Audio. They have mostly stopped moving.",
+      "audio": "cluster_4.wav", "cell_ids": [32]
+    },
+    {
+      "cluster_id": 5, "rank": 5, "name": "Outward movers", "n_cells": 15,
+      "unusual": true, "instrument": "bell", "color": "#FF7A6B",
+      "mean_speed": 1.6, "mean_radial_v": 0.7, "mean_angular_v": -0.05,
+      "description": "Unusual: this small group moves away from the Point of Audio while everyone else moves toward it. Worth a closer look.",
+      "audio": "cluster_5.wav", "cell_ids": [45]
+    }
+  ],
+  "cells": [
+    {
+      "cell_id": 12, "cluster_id": 1, "mean_speed": 1.4, "distance_travelled": 1380,
+      "start_dist_poa": 210, "end_dist_poa": 60,
+      "confidence": { "level": "high", "frames_tracked": 200, "frames_missing": 0 },
+      "description": "Cell 12 starts in the top left and moves steadily toward the Point of Audio.",
+      "events": [ { "minute": 0, "text": "Starts 210 µm from the Point of Audio, moving slowly." } ],
+      "path": [[40, 30], [60, 48], [110, 120]],
+      "audio": "cell_12.wav"
+    }
+  ]
+}

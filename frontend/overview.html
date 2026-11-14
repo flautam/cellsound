@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Population overview — Cell Migration Sonification</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="app theme-light size-1" data-step="3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="site-header">
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 10v4M6 7v10M10 4v16M14 8v8M18 6v12M22 10v4"></path></svg></span>cellsound</a>
+  <div class="header-tools">
+    <div class="display-wrap">
+      <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M5 19 9.5 5h2L16 19h-2.2l-.9-2.6H8.1L7.2 19H5zm3.6-4.4h3.8L10.6 8.2 8.6 14.6zM18 19V8.5h-1.6L14 10v1.8l2.4-1.4H17V19H18z"></path></svg>Text size &amp; contrast<svg class="chevron" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div id="display-panel" class="display-panel" role="group" aria-label="Text size and contrast" hidden>
+        <div class="field">
+          <label for="text-size">Text size</label>
+          <select class="select" id="text-size">
+            <option value="1">Standard</option>
+            <option value="2">Larger</option>
+            <option value="3">Largest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contrast">Contrast</label>
+          <select class="select" id="contrast">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="hc">High contrast</option>
+          </select>
+        </div>
+        <label class="check-label" for="pause-animations">
+          <input type="checkbox" id="pause-animations"> Pause animations
+        </label>
+        <button type="button" class="done-btn" id="display-done">Done</button>
+      </div>
+    </div>
+    <a class="help-link" href="#help">Help</a>
+  </div>
+</header>
+<nav class="steps" aria-label="Analysis steps">
+  <ol>
+    <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
+<li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
+<li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Overview</a></li>
+<li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3"></circle><circle cx="17" cy="8" r="3"></circle><circle cx="12" cy="17" r="3"></circle></svg>Clusters</a></li>
+<li><a class="step-link" data-step-link="5" href="#"><span class="badge badge-6" aria-hidden="true">5</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
+  </ol>
+</nav>
+
+<main id="main" tabindex="-1">
+<div class="hero hero-lilac">
+  <div class="mesh" aria-hidden="true"><i></i><i></i></div>
+  <div class="hero-inner">
+    <div class="hero-bar">
+      <p class="step-kicker">Step 3 of 5</p>
+      <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
+        <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+        <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
+        <span data-pause-label>Pause animations</span>
+      </button>
+    </div>
+    <h1>Hear the whole population</h1>
+    <p class="lede" id="hero-lede">Loading the population summary.</p>
+  </div>
+</div>
+<div class="page stack">
+  <section class="card" aria-labelledby="listen-h">
+    <h2 id="listen-h">Listen</h2>
+    <div class="flow">
+      <button type="button" class="btn btn-primary" id="play"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg><span id="play-label">Play overview</span></button>
+      <button type="button" class="btn btn-line" id="replay">Replay from start</button>
+      <button type="button" class="btn btn-stop" id="stop">Stop all sound (Esc)</button>
+    </div>
+    <div class="cues" id="wave" aria-hidden="true">
+      <div class="cue"><span>Pitch</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
+      <div class="cue"><span>Volume</span><span class="cue-track"><i id="volume-fill"></i></span></div>
+      <div class="cue"><span>Beat</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
+    </div>
+    <p class="hint">The picture changes only when the video moves forward. Pitch shows direction, volume shows closeness, and the beat shows speed.</p>
+    <div class="split">
+      <div class="field" style="flex:2 1 18em">
+        <label for="pos">Position in video</label>
+        <input id="pos" type="range" min="0" max="200" value="0" aria-valuetext="0 hours 0 minutes of 16 hours 40 minutes">
+        <p class="hint" id="pos-visible" aria-hidden="true">0 hours 0 minutes of 16 hours 40 minutes</p>
+      </div>
+      <div class="field" style="flex:1 1 10em">
+        <label for="rate">Playback speed</label>
+        <select class="select" id="rate">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1 1 12em">
+        <label for="vol">App volume</label>
+        <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent" aria-describedby="vol-hint">
+        <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader.</p>
+      </div>
+    </div>
+    <div class="flow">
+      <label class="check-label"><input type="checkbox" id="move-end" checked> When the sound ends, move to the description</label>
+    </div>
+    <p class="hint">Left and right is part of the sound. A cell to the left of the Point of Audio plays in the left ear, and a cell to the right plays in the right ear.</p>
+    <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Ready. Press Play overview to start. Sound never plays on its own.</p>
+  </section>
+
+  <section class="card" aria-labelledby="trace-h">
+    <div class="hero-bar">
+        <div class="copy">
+        <h2 id="trace-h">Cluster traces</h2>
+        <p class="hint">Every cell's path, colored by cluster. Drawn from your tracking results.</p>
+      </div>
+      <div class="field">
+        <label for="trace-show">Show</label>
+        <select class="select" id="trace-show"><option value="all">All clusters</option></select>
+      </div>
+    </div>
+    <div class="split">
+      <svg class="trace-svg" id="traces" role="img" aria-labelledby="trace-title" viewBox="0 0 512 512">
+        <title id="trace-title">Cluster traces are loading.</title>
+        <rect width="512" height="512" fill="var(--header)"></rect>
+        <g id="trace-paths"></g>
+        <g id="trace-poa"></g>
+      </svg>
+      <ul class="legend-list" id="trace-legend" aria-label="Cluster colors"></ul>
+    </div>
+  </section>
+
+  <section class="accordion" id="help" aria-labelledby="how-h">
+    <h2 id="how-h">
+      <button type="button" class="accordion-btn" id="how-btn" aria-expanded="false" aria-controls="how-panel">
+        <span>How to listen<small>Pitch = direction · Volume = closeness · Beat = speed</small></span>
+        <span id="how-state">Show</span>
+      </button>
+    </h2>
+    <div class="accordion-panel" id="how-panel" hidden>
+      <div class="bento" id="how-cards"></div>
+    </div>
+  </section>
+
+  <section class="card desc-band" aria-labelledby="desc-h">
+    <div class="copy">
+      <h2 id="desc-h" tabindex="-1">Description</h2>
+      <p id="desc-text">The description will appear when the summary loads.</p>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="stats">
+        <caption>Population summary</caption>
+        <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">What it means</th></tr></thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="note">
+    <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
+    <div>
+      <h2 id="trust-h">Tracking reliability</h2>
+      <p id="trust-note">Loading the tracking note.</p>
+    </div>
+  </div>
+  <div><a class="btn btn-primary" id="explore" href="clusters.html">Explore the clusters</a></div>
+</div>
+</main>
+<script src="js/audio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script src="js/overview.js"></script>
+</body>
+</html>

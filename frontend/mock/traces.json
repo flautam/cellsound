@@ -1,0 +1,51 @@
+{
+  "width": 512,
+  "height": 512,
+  "poa": { "x": 256, "y": 256 },
+  "clusters": [
+    {
+      "cluster_id": 1,
+      "color": "#6E9BFF",
+      "paths": [
+        [[40, 80], [120, 110], [180, 160], [250, 230]],
+        [[30, 300], [110, 280], [180, 260], [248, 240]],
+        [[90, 40], [140, 90], [190, 150], [246, 220]]
+      ]
+    },
+    {
+      "cluster_id": 2,
+      "color": "#3FD1C9",
+      "paths": [
+        [[400, 120], [460, 200], [400, 300], [300, 320], [240, 240]],
+        [[360, 80], [470, 140], [430, 240], [340, 200]]
+      ]
+    },
+    {
+      "cluster_id": 3,
+      "color": "#B79BFF",
+      "paths": [
+        [[24, 430], [50, 410], [70, 400]],
+        [[480, 450], [450, 420], [430, 410]],
+        [[470, 40], [450, 60], [430, 80]]
+      ]
+    },
+    {
+      "cluster_id": 4,
+      "color": "#F2A93B",
+      "paths": [
+        [[270, 250], [278, 258], [274, 264]],
+        [[240, 248], [236, 256], [244, 260]]
+      ]
+    },
+    {
+      "cluster_id": 5,
+      "color": "#FF7A6B",
+      "paths": [
+        [[270, 230], [340, 180], [430, 120]],
+        [[280, 280], [360, 360], [460, 440]],
+        [[230, 280], [160, 360], [90, 430]]
+      ]
+    }
+  ],
+  "description": "Traces of 142 cells over 16 hours, colored by cluster, with the Point of Audio in the center. Cluster 1 drifts inward, cluster 2 circles, cluster 3 barely moves near the edges, cluster 4 pauses next to the center, and cluster 5 moves outward."
+}

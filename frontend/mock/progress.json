@@ -1,0 +1,7 @@
+{
+  "status": "running",
+  "stage": "tracking",
+  "frame": 80,
+  "total_frames": 200,
+  "message": "Detecting and tracking nuclei"
+}

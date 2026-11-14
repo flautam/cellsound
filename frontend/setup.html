@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Point of Audio and settings — Cell Migration Sonification</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="app theme-light size-1" data-step="2">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="site-header">
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 10v4M6 7v10M10 4v16M14 8v8M18 6v12M22 10v4"></path></svg></span>cellsound</a>
+  <div class="header-tools">
+    <div class="display-wrap">
+      <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M5 19 9.5 5h2L16 19h-2.2l-.9-2.6H8.1L7.2 19H5zm3.6-4.4h3.8L10.6 8.2 8.6 14.6zM18 19V8.5h-1.6L14 10v1.8l2.4-1.4H17V19H18z"></path></svg>Text size &amp; contrast<svg class="chevron" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div id="display-panel" class="display-panel" role="group" aria-label="Text size and contrast" hidden>
+        <div class="field">
+          <label for="text-size">Text size</label>
+          <select class="select" id="text-size">
+            <option value="1">Standard</option>
+            <option value="2">Larger</option>
+            <option value="3">Largest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contrast">Contrast</label>
+          <select class="select" id="contrast">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="hc">High contrast</option>
+          </select>
+        </div>
+        <label class="check-label" for="pause-animations">
+          <input type="checkbox" id="pause-animations"> Pause animations
+        </label>
+        <button type="button" class="done-btn" id="display-done">Done</button>
+      </div>
+    </div>
+    <a class="help-link" href="#help">Help</a>
+  </div>
+</header>
+<nav class="steps" aria-label="Analysis steps">
+  <ol>
+    <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
+<li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
+<li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Overview</a></li>
+<li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3"></circle><circle cx="17" cy="8" r="3"></circle><circle cx="12" cy="17" r="3"></circle></svg>Clusters</a></li>
+<li><a class="step-link" data-step-link="5" href="#"><span class="badge badge-6" aria-hidden="true">5</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
+  </ol>
+</nav>
+
+<main id="main" tabindex="-1">
+<div class="hero hero-butter">
+  <div class="mesh" aria-hidden="true"><i></i><i></i></div>
+  <div class="hero-inner">
+    <div class="hero-bar">
+      <p class="step-kicker">Step 2 of 5</p>
+      <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
+        <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+        <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
+        <span data-pause-label>Pause animations</span>
+      </button>
+    </div>
+    <h1>Place your Point of Audio</h1>
+    <p class="lede">The Point of Audio is where you "stand" to listen, like a point of view for sound. Cells near it sound louder. Cells moving toward it rise in pitch.</p>
+    <p class="calib-kept" id="calib-kept"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg><span>Checking the calibration from upload.</span></p>
+  </div>
+</div>
+<div class="page stack">
+  <section class="card" id="help" aria-labelledby="poa-h">
+    <div>
+      <h2 id="poa-h" tabindex="-1">Move the Point of Audio</h2>
+      <p class="hint">Nudge it with the arrow buttons or type an exact spot. Every move is read aloud.</p>
+    </div>
+    <div class="split">
+      <div class="preview-wrap">
+        <svg class="preview" id="preview" role="img" aria-labelledby="preview-title" viewBox="0 0 512 512">
+          <title id="preview-title">First frame. The Point of Audio is loading.</title>
+          <rect width="512" height="512" fill="var(--header)"></rect>
+          <g id="cell-dots"></g>
+          <g id="crosshair" fill="none" stroke-linecap="round">
+            <circle class="pulse" r="28" stroke="var(--danger)" stroke-width="6" opacity="0.35"></circle>
+            <circle r="22" stroke="var(--on-header)" stroke-width="8"></circle>
+            <circle r="22" stroke="var(--danger)" stroke-width="4"></circle>
+            <path d="M0 -36v16M0 20v16M-36 0h16M20 0h16" stroke="var(--on-header)" stroke-width="8"></path>
+            <path d="M0 -36v16M0 20v16M-36 0h16M20 0h16" stroke="var(--danger)" stroke-width="4"></path>
+          </g>
+        </svg>
+        <div class="readout">
+          <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Loading the first frame.</p>
+          <p class="legend"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 56 56"><circle cx="28" cy="28" r="18" fill="none" stroke="var(--danger)" stroke-width="6"></circle><path d="M28 4v12M28 40v12M4 28h12M40 28h12" stroke="var(--danger)" stroke-width="6"></path></svg><span id="frame-legend">First frame</span></p>
+        </div>
+      </div>
+      <div class="nudge">
+        <h3>Nudge it</h3>
+        <div class="pad" role="group" aria-label="Move Point of Audio">
+          <span></span>
+          <button type="button" id="up"><span aria-hidden="true">↑</span>Up</button>
+          <span></span>
+          <button type="button" id="left"><span aria-hidden="true">←</span>Left</button>
+          <button type="button" class="mid" id="center"><span aria-hidden="true">⊕</span>Center</button>
+          <button type="button" id="right"><span aria-hidden="true">→</span>Right</button>
+          <span></span>
+          <button type="button" id="down"><span aria-hidden="true">↓</span>Down</button>
+          <span></span>
+        </div>
+        <div class="field" style="width:100%;max-width:16em">
+          <label for="step">Nudge distance</label>
+          <select class="select" id="step">
+            <option value="8">8 pixels</option>
+            <option value="16">16 pixels</option>
+            <option value="32" selected>32 pixels</option>
+            <option value="64">64 pixels</option>
+          </select>
+        </div>
+        <hr class="rule">
+        <h3>Or type an exact spot</h3>
+        <div class="pair" style="width:100%;max-width:20em">
+          <div class="field">
+            <label for="px-x">X (0–512)</label>
+            <input class="text-input" id="px-x" type="number" min="0" max="512" step="32" value="256">
+          </div>
+          <div class="field">
+            <label for="px-y">Y (0–512)</label>
+            <input class="text-input" id="px-y" type="number" min="0" max="512" step="32" value="256">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="set-h">
+    <h2 id="set-h">Analysis settings</h2>
+    <div class="split">
+      <fieldset class="panel panel-lilac">
+        <legend class="panel-title">What should pitch follow?</legend>
+        <label class="choice"><input type="radio" name="pitch" value="radial" checked><span><strong>Toward or away (radial velocity)</strong><br>Pitch rises as cells move toward the Point of Audio.</span></label>
+        <label class="choice"><input type="radio" name="pitch" value="angular"><span><strong>Circling (angular velocity)</strong><br>Pitch rises for counterclockwise motion around it.</span></label>
+        <label class="choice"><input type="radio" name="pitch" value="speed"><span><strong>Speed only</strong><br>Pitch follows how fast cells move, in any direction.</span></label>
+      </fieldset>
+      <div class="panel panel-mint">
+        <label class="panel-title" for="clusters">Number of clusters</label>
+        <p id="k-hint" class="hint">More clusters means finer differences between cell behaviors.</p>
+        <p class="big-num" id="cluster-num" aria-hidden="true">5</p>
+        <input id="clusters" type="range" min="2" max="10" step="1" value="5" aria-valuetext="5 clusters" aria-describedby="k-hint">
+        <div class="ends" aria-hidden="true"><span>2</span><span>10</span></div>
+      </div>
+    </div>
+    <div class="panel panel-peach">
+      <label class="panel-title" for="basis">Clustering basis: position vs. velocity</label>
+      <p id="basis-hint" class="hint">When cells are grouped, how much should <strong>position</strong> (where a cell is: x, y) count compared with <strong>velocity</strong> (how it moves: speed and direction)?</p>
+      <p class="pill" id="basis-word" aria-hidden="true">Equal weight</p>
+      <input id="basis" type="range" min="0" max="100" step="25" value="50" aria-valuetext="Equal weight" aria-describedby="basis-hint">
+      <div class="ends" aria-hidden="true"><span><strong>Position</strong><br>x, y</span><span style="text-align:right"><strong>Velocity</strong><br>speed, direction</span></div>
+    </div>
+    <fieldset class="panel panel-sky">
+      <legend class="panel-title">Volume level by distance</legend>
+      <p class="hint">Cells are split into thirds by how far they are from the Point of Audio. Set a volume level for each third.</p>
+      <div class="vol-row">
+        <div class="vol-card">
+          <label for="vol-near">Closest third<span class="sr"> volume level</span></label>
+          <p class="big-num" aria-hidden="true"><span id="near-num">100</span>%</p>
+          <input id="vol-near" type="range" min="0" max="100" step="5" value="100" aria-valuetext="Closest third volume level, 100 percent">
+          <p class="hint">Cells nearest the Point of Audio.</p>
+        </div>
+        <div class="vol-card">
+          <label for="vol-mid">Middle third<span class="sr"> volume level</span></label>
+          <p class="big-num" aria-hidden="true"><span id="mid-num">50</span>%</p>
+          <input id="vol-mid" type="range" min="0" max="100" step="5" value="50" aria-valuetext="Middle third volume level, 50 percent">
+          <p class="hint">Cells at a medium distance.</p>
+        </div>
+        <div class="vol-card">
+          <label for="vol-far">Farthest third<span class="sr"> volume level</span></label>
+          <p class="big-num" aria-hidden="true"><span id="far-num">25</span>%</p>
+          <input id="vol-far" type="range" min="0" max="100" step="5" value="25" aria-valuetext="Farthest third volume level, 25 percent">
+          <p class="hint">Low levels also sound muffled.</p>
+        </div>
+      </div>
+      <label class="choice"><input type="checkbox" id="reverse"><span><strong>Reverse</strong>: make far cells louder (swaps the closest and farthest levels)</span></label>
+    </fieldset>
+    <p id="run-error" class="error" hidden></p>
+    <div class="flow">
+      <button type="button" class="btn btn-primary" id="run">Run analysis</button>
+      <button type="button" class="btn btn-line" id="reset">Reset to defaults</button>
+    </div>
+  </section>
+</div>
+</main>
+<script src="js/audio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script src="js/setup.js"></script>
+</body>
+</html>

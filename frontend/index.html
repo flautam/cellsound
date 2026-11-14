@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start: upload a video — Cell Migration Sonification</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="app theme-light size-1" data-step="1">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="site-header">
+  <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 10v4M6 7v10M10 4v16M14 8v8M18 6v12M22 10v4"></path></svg></span>cellsound</a>
+  <div class="header-tools">
+    <div class="display-wrap">
+      <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M5 19 9.5 5h2L16 19h-2.2l-.9-2.6H8.1L7.2 19H5zm3.6-4.4h3.8L10.6 8.2 8.6 14.6zM18 19V8.5h-1.6L14 10v1.8l2.4-1.4H17V19H18z"></path></svg>Text size &amp; contrast<svg class="chevron" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div id="display-panel" class="display-panel" role="group" aria-label="Text size and contrast" hidden>
+        <div class="field">
+          <label for="text-size">Text size</label>
+          <select class="select" id="text-size">
+            <option value="1">Standard</option>
+            <option value="2">Larger</option>
+            <option value="3">Largest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contrast">Contrast</label>
+          <select class="select" id="contrast">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="hc">High contrast</option>
+          </select>
+        </div>
+        <label class="check-label" for="pause-animations">
+          <input type="checkbox" id="pause-animations"> Pause animations
+        </label>
+        <button type="button" class="done-btn" id="display-done">Done</button>
+      </div>
+    </div>
+    <a class="help-link" href="#help">Help</a>
+  </div>
+</header>
+<nav class="steps" aria-label="Analysis steps">
+  <ol>
+    <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
+<li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
+<li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Overview</a></li>
+<li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3"></circle><circle cx="17" cy="8" r="3"></circle><circle cx="12" cy="17" r="3"></circle></svg>Clusters</a></li>
+<li><a class="step-link" data-step-link="5" href="#"><span class="badge badge-6" aria-hidden="true">5</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
+  </ol>
+</nav>
+
+<main id="main" tabindex="-1">
+<div class="hero hero-sky">
+  <div class="mesh" aria-hidden="true"><i></i><i></i></div>
+  <div class="hero-inner">
+    <div class="hero-bar">
+      <p class="step-kicker">Start here · Step 1 of 5</p>
+      <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
+        <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+        <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
+        <span data-pause-label>Pause animations</span>
+      </button>
+    </div>
+    <div class="hero-card rise">
+      <div class="hero-copy">
+        <div>
+          <h1>Hear how your cells move</h1>
+          <p class="lede">Upload a microscopy video. We find every nucleus, follow it, and turn its movement into sound and plain-language descriptions. Everything works with a keyboard and screen reader.</p>
+          <div class="flow">
+            <a class="btn btn-primary lift" href="#choose-h"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Start step 1: upload your video<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg></a>
+            <a class="btn btn-line lift" href="#help">Check your sound first</a>
+          </div>
+        </div>
+        <svg class="art float" aria-hidden="true" viewBox="0 0 300 200">
+          <circle cx="150" cy="100" r="86" fill="none" stroke="var(--primary)" stroke-width="6" opacity="0.3"></circle>
+          <circle cx="150" cy="100" r="58" fill="none" stroke="var(--primary)" stroke-width="6" opacity="0.5"></circle>
+          <circle cx="150" cy="100" r="30" fill="none" stroke="var(--primary)" stroke-width="6" opacity="0.75"></circle>
+          <circle cx="150" cy="100" r="11" fill="var(--danger)"></circle>
+          <circle cx="66" cy="48" r="16" fill="var(--sun)" stroke="var(--ink)" stroke-width="3"></circle>
+          <circle cx="236" cy="60" r="13" fill="var(--ok)" stroke="var(--ink)" stroke-width="3"></circle>
+          <circle cx="218" cy="160" r="15" fill="var(--primary)" stroke="var(--ink)" stroke-width="3"></circle>
+          <circle cx="70" cy="156" r="12" fill="var(--danger)" stroke="var(--ink)" stroke-width="3"></circle>
+        </svg>
+      </div>
+      <div>
+        <h2>How it works, in 5 steps</h2>
+        <ol class="mini-steps">
+          <li class="mini-step here"><span class="mini-top" aria-hidden="true"><span class="mini-num">1</span></span><strong>Upload</strong><span>Add your MP4</span><span class="here-tag">You are here</span></li>
+          <li class="mini-step tint-2"><span class="mini-top" aria-hidden="true"><span class="mini-num">2</span></span><strong>Point of Audio</strong><span>Choose where to listen</span></li>
+          <li class="mini-step tint-3"><span class="mini-top" aria-hidden="true"><span class="mini-num">3</span></span><strong>Overview</strong><span>Hear every cell</span></li>
+          <li class="mini-step tint-4"><span class="mini-top" aria-hidden="true"><span class="mini-num">4</span></span><strong>Clusters</strong><span>Hear each group</span></li>
+          <li class="mini-step tint-6"><span class="mini-top" aria-hidden="true"><span class="mini-num">5</span></span><strong>Export</strong><span>Save your results</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page stack">
+  <section class="band rise" id="help" aria-labelledby="before-h">
+    <div>
+      <h2 id="before-h" tabindex="-1">Before you start</h2>
+      <p>We use sound panning (left and right speakers) to help distinguish cell movement. Headphones are recommended.</p>
+      <button type="button" class="btn btn-quiet lift" id="sound-check"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"></path><rect x="3" y="14" width="4" height="6" rx="1.5"></rect><rect x="17" y="14" width="4" height="6" rx="1.5"></rect></svg>Play sound check</button>
+    </div>
+    <div>
+      <h3>Make it comfortable</h3>
+      <ul>
+        <li>You can customize <strong>text size &amp; contrast</strong> using the settings the top of every screen.</li>
+        <li>Pressing <strong>Esc</strong> stops all sound.</li>
+        <li>Toggle <strong>Pause animations</strong> under <strong>Text size &amp; contrast</strong> to stop all movement.</li>
+      </ul>
+    </div>
+  </section>
+  <section class="card rise" aria-labelledby="choose-h">
+    <h2 id="choose-h" tabindex="-1">Step 1: Choose your video</h2>
+    <div class="drop" id="drop">
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>
+      <label id="video-label" class="drop-title" for="video">Video file (MP4)</label>
+      <input id="video" class="sr file-in" type="file" accept="video/mp4,.mp4" aria-labelledby="video-label" aria-describedby="video-hint">
+      <label for="video" class="file-btn" aria-hidden="true">Choose file</label>
+      <p id="file-name" class="file-name" aria-hidden="true">No file chosen</p>
+      <p id="video-hint" class="hint">MP4 format, up to 100MB. You can also drag a file onto this box.</p>
+      <p id="video-error" class="error" hidden></p>
+    </div>
+    <fieldset class="fields">
+      <legend>Calibration (optional)</legend>
+      <p id="calib-hint" class="hint">Add these for results in micrometers per minute. Without them, results use pixels per frame.</p>
+      <div class="pair">
+        <div class="field">
+          <label for="px">Pixel size (µm per pixel)</label>
+          <input class="text-input" id="px" type="number" step="0.01" min="0" aria-describedby="calib-hint calib-error">
+        </div>
+        <div class="field">
+          <label for="dt">Time between frames (minutes)</label>
+          <input class="text-input" id="dt" type="number" step="0.1" min="0" aria-describedby="calib-hint calib-error">
+        </div>
+      </div>
+      <p id="calib-error" class="error" hidden></p>
+    </fieldset>
+    <div>
+      <button type="button" class="btn btn-primary lift" id="start"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Start processing</button>
+    </div>
+  </section>
+  <section class="card rise" aria-labelledby="proc-h">
+    <h2 id="proc-h">Processing</h2>
+    <div class="field">
+      <label id="prog-label" for="prog">Finding and following nuclei: not started</label>
+      <div class="bar" aria-hidden="true"><span id="bar-fill"></span></div>
+      <progress id="prog" class="sr" max="200" value="0">0%</progress>
+    </div>
+    <ol class="checks">
+      <li id="check-received"><span class="dot" aria-hidden="true">1</span><span>Video received, <span id="received-count">0</span> frames: <strong>Waiting</strong></span></li>
+      <li id="check-track"><span class="dot" aria-hidden="true">2</span><span>Detecting and tracking nuclei: <strong>Waiting</strong></span></li>
+    </ol>
+    <div class="status-box">
+      <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+      <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Press Start processing after you choose an MP4. We will announce each quarter.</p>
+    </div>
+    <div><a class="btn btn-primary" id="continue" href="setup.html" hidden>Continue to Point of Audio</a></div>
+  </section>
+</div>
+</main>
+<script src="js/audio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script src="js/upload.js"></script>
+</body>
+</html>
