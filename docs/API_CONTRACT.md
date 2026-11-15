@@ -14,6 +14,8 @@ All URLs are relative (`/api/...`), so the same code works locally, on Coder, an
 | 6 | `GET /api/jobs/{job_id}/traces` | ☑ |
 | 7 | `GET /api/jobs/{job_id}/audio/{name}.wav` | ☑ |
 | 8 | `GET /api/jobs/{job_id}/export.zip?include=audio,text,data,settings` | ☑ |
+| 11 | `GET /api/jobs/{job_id}/motion-types` | ☑ |
+| 12 | `GET /api/sort` and `POST /api/sort` | ☑ |
 
 Key idea: **tracking runs once per video** (slow, GPU). Everything after it (motion, clusters, descriptions, sound) reruns quickly through `/analyze` whenever the user moves the Point of Audio or changes a setting.
 
@@ -136,7 +138,50 @@ Errors use the same top-level `{ "error", "message" }` shape: `no_video`, `too_m
 ## 10. Batch progress: `GET /api/batches/{batch_id}`
 Same JSON as the upload response. `status` is `queued`, `running`, `done`, or `error`. Each video has its own `status`, `frame`, and `total_frames`. An example is `frontend/mock/batch.json`.
 
-## Motion types file (not an endpoint yet)
+## 11. Behavior labels: `GET /api/jobs/{job_id}/motion-types`
+Reads `output/jobs/{job_id}/motion_types.json`. If that file is missing but the job already has `summary.json`, `motion.csv`, and `tracks.csv`, the server writes it and returns the same JSON. `POST /api/jobs` and `POST /api/jobs/{job_id}/analyze` keep their existing response bodies. Analyze also writes this file before it returns `{ "status": "done" }`.
+
+`404` when tracing is not finished: `{ "error": "not_ready", "message": "Finish cell tracing before behavior labels are available." }`.
+
+An example is `frontend/mock/motion_types.json`.
+
+## 12. Sort videos by behavior: `GET /api/sort` and `POST /api/sort`
+The sorter sends behavior labels to Grok. It does not send the video file. The API key is read on the server from `XAI_API_KEY`. If that variable is unset, the server does not invent an answer.
+
+`GET /api/sort` when the key is missing:
+
+```json
+{
+  "configured": false,
+  "message": "Sorting is unavailable because the server has no API key. Videos stay in their current order, with their behavior labels."
+}
+```
+
+`POST /api/sort` body:
+
+```json
+{
+  "question": "show videos where cells move up",
+  "videos": [
+    { "job_id": "a1b2c3", "name": "left.mov" },
+    { "job_id": "d4e5f6", "name": "right.mov" }
+  ]
+}
+```
+
+The server loads each job's behavior labels and sends those labels with the question. A successful sort, also saved as `frontend/mock/sort.json`:
+
+```json
+{
+  "configured": true,
+  "job_ids": ["d4e5f6", "a1b2c3"],
+  "reason": "The video whose cells move up is listed first."
+}
+```
+
+If the key is missing, `POST` still returns `200` with `"configured": false`, the original `job_ids` order, and a `reason` that says sorting is unavailable. A failed Grok call returns `502 { "error": "sort_failed", "message": "Sorting could not finish. Videos stay in their current order." }`.
+
+## Motion types file
 Written beside one finished job as `output/jobs/{job_id}/motion_types.json`. Existing job endpoints are unchanged. An example is `frontend/mock/motion_types.json`.
 
 Each cluster has one main label, a `search_types` list, and a 0–1 score for every type. A search for any label in `search_types` can find that cluster. A second label is added when its score is within `close_gap` of the winner and at least `close_floor`. Types: `still`, `left`, `right`, `up`, `down`, `inward`, `outward`, `circling clockwise`, `circling counterclockwise`. Up is toward the top of the image. Clockwise is clockwise on the image. Inward means toward the Point of Audio when one was saved, otherwise the image center. Scores use pixels per frame. The thresholds live in `backend/motion_types.py`.

@@ -1,9 +1,9 @@
 """Write the wav files the Play buttons and the download zip share.
 
-Each cluster keeps one fixed tone, like a hearing test. Cluster 1 is
-220 Hz and cluster 10 is 880 Hz. Pulse rate follows speed: fast clusters
-tap quickly, slow clusters tap slowly. Pitch bend follows toward/away
-motion so direction is easier to hear. Tones are synthesized here (soft
+Each video uses one tone. The pulse is the beat and follows speed.
+Pitch rises when motion is toward the Point of Audio and falls when it
+moves away. Volume follows distance from that point. Stereo pan follows
+left versus right of that point. The tone is synthesized here (soft
 triangle), not loaded from a sample library.
 """
 
@@ -17,20 +17,9 @@ import soundfile as sf
 
 RATE = 22050
 
-# One comfortable pitch per cluster number. Steps are about a minor third,
-# so neighbors stay easy to tell apart and nothing sits in a squeal or a rumble.
-CLUSTER_HZ = (
-    220.0,
-    256.0,
-    299.0,
-    349.0,
-    407.0,
-    475.0,
-    554.0,
-    647.0,
-    754.0,
-    880.0,
-)
+# One comfortable pitch for the whole video. Clusters share it.
+# Pitch bend, pulse, volume, and pan carry the motion.
+VIDEO_HZ = 440.0
 
 # Slow clusters tap about once a second. Fast ones tap quickly.
 # All pulse rates run at 80% so beats feel a bit slower overall.
@@ -56,23 +45,12 @@ PAN_NEAR = 0.12
 
 
 def tone_hz(cluster_id) -> float:
-    try:
-        index = int(cluster_id) - 1
-    except (TypeError, ValueError):
-        index = 0
-    if index < 0:
-        index = 0
-    return float(CLUSTER_HZ[index % len(CLUSTER_HZ)])
+    """Every cluster in a video shares this pitch. The id is unused on purpose."""
+    return float(VIDEO_HZ)
 
 
 def tone_name(cluster_id) -> str:
-    try:
-        number = int(cluster_id)
-    except (TypeError, ValueError):
-        number = 1
-    if number < 1:
-        number = 1
-    return f"Tone {((number - 1) % len(CLUSTER_HZ)) + 1}"
+    return "One tone"
 
 
 def _columns(motion: pd.DataFrame, cell_ids):
@@ -198,31 +176,34 @@ def _curve(freq, amp, pulse, pan):
 def _examples():
     count = int(RATE * 3)
     line = np.linspace(0, 1, count)
-    # Three cluster tones in a row, each tapping slowly so the pitch is clear.
-    tones = np.piecewise(
-        line,
-        [line < 1 / 3, (line >= 1 / 3) & (line < 2 / 3), line >= 2 / 3],
-        [CLUSTER_HZ[0], CLUSTER_HZ[4], CLUSTER_HZ[7]],
-    )
-    tone = _curve(tones, np.full(count, 0.8), np.full(count, 1.6), np.zeros(count))
-    # Same tone, pulses speeding up as the cluster moves faster.
+    # One tone. Pitch rises then falls, like motion toward then away from the Point of Audio.
+    pitch_scale = 1.0 + 0.18 * np.sin(2 * np.pi * line)
+    tone = _curve(np.full(count, VIDEO_HZ) * pitch_scale, np.full(count, 0.8), np.full(count, 1.6), np.zeros(count))
     pulse = _curve(
-        np.full(count, CLUSTER_HZ[4]),
+        np.full(count, VIDEO_HZ),
         np.full(count, 0.8),
         PULSE_SLOW + (PULSE_FAST - PULSE_SLOW) * line,
         np.zeros(count),
     )
-    # Two clusters at once: one slow, one fast.
-    slow = _curve(np.full(count, CLUSTER_HZ[1]), np.full(count, 0.75), np.full(count, PULSE_SLOW), np.full(count, -0.35))
-    fast = _curve(np.full(count, CLUSTER_HZ[6]), np.full(count, 0.75), np.full(count, PULSE_FAST), np.full(count, 0.35))
-    together = _level(slow * 0.7 + fast * 0.7)
+    volume = _curve(
+        np.full(count, VIDEO_HZ),
+        VOL_NEAR - (VOL_NEAR - VOL_FAR) * line,
+        np.full(count, 2.0),
+        np.zeros(count),
+    )
+    # Same tone, moving from the left speaker to the right.
+    side = _curve(
+        np.full(count, VIDEO_HZ),
+        np.full(count, 0.8),
+        np.full(count, 2.2),
+        np.linspace(-0.9, 0.9, count),
+    )
     return {
         "example_tone.wav": tone,
         "example_pulse.wav": pulse,
-        "example_all.wav": together,
-        # Older button names, same demonstrations, so a stale page still plays a tone.
+        "example_all.wav": side,
         "example_pitch.wav": tone,
-        "example_volume.wav": pulse,
+        "example_volume.wav": volume,
         "example_beat.wav": pulse,
     }
 
@@ -245,7 +226,7 @@ def write_sounds(folder: Path, motion: pd.DataFrame, summary: dict, poa_x: float
     if layers:
         overview = _level(np.sum(layers, axis=0))
     else:
-        overview = _from_motion(CLUSTER_HZ[0], radial, speed, dist, xs, ys, poa_x, poa_y, span, seconds)
+        overview = _from_motion(VIDEO_HZ, radial, speed, dist, xs, ys, poa_x, poa_y, span, seconds)
     sf.write(folder / "overview.wav", overview, RATE)
     for name, wave in _examples().items():
         sf.write(folder / name, wave, RATE)

@@ -230,6 +230,12 @@ function pollBatch(batchId) {
     drawBatch(data);
     if (data.status === "done" || data.status === "error") {
       startButton.disabled = false;
+      if (data.status === "done") {
+        const first = (data.videos || []).find(function (video) { return video.job_id; });
+        if (first) setJobId(first.job_id);
+        continueLink.hidden = false;
+        continueLink.href = hrefWithJob("setup.html");
+      }
       batchHeading.focus();
       return;
     }
@@ -286,6 +292,18 @@ startButton.addEventListener("click", function () {
     showFileError(error.message);
   });
 });
+
+const getStarted = document.getElementById("get-started");
+if (getStarted) {
+  getStarted.addEventListener("click", function () {
+    const target = document.getElementById("before-h");
+    if (!target) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const paused = document.body.classList.contains("pause-motion");
+    target.scrollIntoView({ behavior: (reduce || paused) ? "auto" : "smooth", block: "start" });
+    target.focus({ preventScroll: true });
+  });
+}
 
 soundButton.addEventListener("click", function () {
   playSoundCheck();

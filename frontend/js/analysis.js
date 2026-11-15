@@ -36,8 +36,8 @@ function signed(value, places) {
   return "0";
 }
 
-function toneLabel(cluster) {
-  return "Tone " + cluster.cluster_id;
+function toneLabel() {
+  return "one tone for this video";
 }
 
 function selected() {
@@ -83,8 +83,9 @@ function paintCues(on) {
     return;
   }
   const cluster = selected();
-  const toneIndex = cluster ? Math.max(0, Math.min(9, Number(cluster.cluster_id) - 1)) : 4;
-  pitchFill.style.width = Math.round(18 + toneIndex * 8) + "%";
+  const radial = cluster && cluster.mean_radial_v != null ? Number(cluster.mean_radial_v) : 0;
+  const toward = Math.max(0, Math.min(1, 0.5 - radial / 8));
+  pitchFill.style.width = Math.round(toward * 100) + "%";
   const speed = cluster && cluster.mean_speed != null ? Number(cluster.mean_speed) : 0;
   const level = Math.max(0, Math.min(beatDots.length - 1, Math.round(speed)));
   beatDots.forEach(function (dot, index) {
@@ -92,14 +93,39 @@ function paintCues(on) {
   });
 }
 
+function timelineRate() {
+  const value = Number(document.getElementById("rate").value);
+  return value > 0 ? value : 0.5;
+}
+
+function fitChunkSpeed() {
+  const rate = timelineRate();
+  if (tone && tone.setRate) tone.setRate(rate);
+  if (!chunkVideo) return;
+  let videoRate = rate;
+  const audioDuration = tone && tone.duration ? tone.duration() : 0;
+  if (audioDuration > 0 && chunkVideo.duration > 0 && isFinite(chunkVideo.duration)) {
+    videoRate = rate * (chunkVideo.duration / audioDuration);
+  }
+  if (Math.abs((chunkVideo.playbackRate || 0) - videoRate) > 0.02) {
+    chunkVideo.playbackRate = videoRate;
+  }
+}
+
 function syncChunkVideo(shouldPlay) {
   if (!chunkVideo || !chunkVideo.src) return;
-  if (tone && tone.ready && tone.ready()) {
-    try { chunkVideo.currentTime = tone.currentRatio() * (chunkVideo.duration || 0); } catch (error) { /* seek */ }
+  fitChunkSpeed();
+  if (tone && tone.ready && tone.ready() && chunkVideo.duration) {
+    const target = tone.currentRatio() * chunkVideo.duration;
+    if (Math.abs((chunkVideo.currentTime || 0) - target) > 0.4) {
+      try { chunkVideo.currentTime = target; } catch (error) { /* seek */ }
+    }
   }
   if (shouldPlay) {
-    const play = chunkVideo.play();
-    if (play && play.catch) play.catch(function () { /* autoplay blocked */ });
+    if (chunkVideo.paused) {
+      const play = chunkVideo.play();
+      if (play && play.catch) play.catch(function () { /* autoplay blocked */ });
+    }
   } else if (!chunkVideo.paused) {
     chunkVideo.pause();
   }
@@ -132,7 +158,7 @@ function playSelected() {
   if (!cluster || !job) return;
   halt();
   setAppVolume(document.getElementById("vol").value);
-  const rate = Number(document.getElementById("rate").value) || 1;
+  const rate = timelineRate();
   const ratio = Number(pos.value) / Number(pos.max);
   tone = playRecording(audioUrl(job, audioName(cluster)), {
     rate: rate,
@@ -162,7 +188,7 @@ function fillPick(cluster, index) {
   const name = document.createElement("strong");
   name.textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
   const meta = document.createElement("span");
-  meta.textContent = "~" + cluster.n_cells + " cells · " + toneLabel(cluster) + " · rank " + cluster.rank;
+  meta.textContent = "~" + cluster.n_cells + " cells · " + toneLabel() + " · rank " + cluster.rank;
   const why = document.createElement("span");
   why.textContent = importanceNote(cluster, index);
   text.appendChild(name);
@@ -200,12 +226,14 @@ function showDetail() {
   document.getElementById("all-radial").textContent = signed(pop.mean_radial_v, 1) + " " + units.speed;
   document.getElementById("cmp-path").textContent = (cluster.start_region || "?") + " → " + (cluster.end_region || "?");
   document.getElementById("tone-note").textContent =
-    toneLabel(cluster) + " is this chunk’s note. Faster pulses mean faster motion. Side follows place relative to the Point of Audio.";
+    "Each video uses one tone, not a different tone for each cluster. The pulse is the beat. Pitch rises when something moves toward the Point of Audio, and falls when it moves away. Volume tells how far away something is. Left and right computer speakers tell direction. Surround-sound headphones give a two-dimensional sense of where the motion is.";
   playLabel.textContent = "Play this chunk " + cluster.cluster_id;
   clusters.forEach(fillPick);
 
   const job = currentJobId();
-  chunkVideo.src = "/api/jobs/" + encodeURIComponent(job) + "/chunks/" + encodeURIComponent(cluster.cluster_id) + "/video.mp4?v=" + Date.now();
+  chunkVideo.playbackRate = 0.5;
+  chunkVideo.defaultPlaybackRate = 0.5;
+  chunkVideo.src = apiPath("/api/jobs/" + encodeURIComponent(job) + "/chunks/" + encodeURIComponent(cluster.cluster_id) + "/video.mp4?v=" + Date.now());
   chunkVideo.load();
   updatePosLabel(0);
 }
@@ -279,9 +307,11 @@ function fillOverview() {
   const trust = summary.reliability || {};
   document.getElementById("trust-note").textContent = trust.note || "Tracking finished.";
   const job = currentJobId();
-  overviewVideo.src = "/api/jobs/" + encodeURIComponent(job) + "/clusters_overlay.mp4?v=" + Date.now();
+  overviewVideo.src = apiPath("/api/jobs/" + encodeURIComponent(job) + "/clusters_overlay.mp4?v=" + Date.now());
   overviewVideo.load();
   document.getElementById("export-link").href = hrefWithJob("export.html");
+  const overviewLink = document.getElementById("overview-link");
+  if (overviewLink) overviewLink.href = hrefWithJob("overview.html");
 }
 
 playButton.addEventListener("click", function () {
@@ -323,9 +353,14 @@ document.getElementById("vol").addEventListener("input", function () {
 });
 
 document.getElementById("rate").addEventListener("change", function () {
-  if (tone && tone.setRate) tone.setRate(Number(document.getElementById("rate").value) || 1);
-  if (chunkVideo) chunkVideo.playbackRate = Number(document.getElementById("rate").value) || 1;
+  fitChunkSpeed();
 });
+
+if (chunkVideo) {
+  chunkVideo.defaultPlaybackRate = 0.5;
+  chunkVideo.playbackRate = 0.5;
+  chunkVideo.addEventListener("loadedmetadata", fitChunkSpeed);
+}
 
 pos.addEventListener("pointerdown", function () { scrubbing = true; });
 pos.addEventListener("pointerup", function () { scrubbing = false; });

@@ -46,8 +46,9 @@
   <ol>
     <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
     <li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
-    <li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Analysis</a></li>
-    <li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
+    <li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>Overview</a></li>
+    <li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Detailed analysis</a></li>
+    <li><a class="step-link" data-step-link="5" href="#"><span class="badge badge-5" aria-hidden="true">5</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
   </ol>
 </nav>
 
@@ -56,7 +57,7 @@
   <div class="mesh" aria-hidden="true"><i></i><i></i></div>
   <div class="hero-inner">
     <div class="hero-bar">
-      <p class="step-kicker">Step 2 of 4</p>
+      <p class="step-kicker">Step 2 of 5</p>
       <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
         <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
         <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
@@ -64,7 +65,8 @@
       </button>
     </div>
     <h1>Place your Point of Audio</h1>
-    <p class="lede">The Point of Audio is where you stand to listen. Each chunk keeps its own tone. Faster motion pulses faster; left and right follow place relative to this point.</p>
+    <p class="lede">The Point of Audio is where you stand to listen. Each video uses one tone. The pulse is the beat. Pitch rises when something moves toward this point and falls when it moves away.</p>
+    <p>This Point of Audio is used for all uploaded videos in the batch.</p>
     <p class="calib-kept" id="calib-kept"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg><span>Checking the calibration from upload.</span></p>
   </div>
 </div>
@@ -72,11 +74,11 @@
   <section class="card" id="help" aria-labelledby="poa-h">
     <div>
       <h2 id="poa-h" tabindex="-1">Move the Point of Audio</h2>
-      <p class="hint">Nudge it with the arrow buttons or type an exact spot. Every move is read aloud.</p>
+      <p class="hint">Tap or drag on the picture to place it. You can also nudge it with the arrow buttons, the arrow keys while the picture is focused, or type an exact spot. Every finished move is read aloud.</p>
     </div>
     <div class="split">
       <div class="preview-wrap">
-        <svg class="preview" id="preview" role="img" aria-labelledby="preview-title" viewBox="0 0 512 512">
+        <svg class="preview" id="preview" tabindex="0" role="group" aria-labelledby="preview-title" viewBox="0 0 512 512">
           <title id="preview-title">First frame. The Point of Audio is loading.</title>
           <rect id="frame-backdrop" width="512" height="512" fill="var(--header)"></rect>
           <image id="frame-image" x="0" y="0" width="512" height="512" preserveAspectRatio="none"></image>
@@ -136,9 +138,8 @@
     <h2 id="set-h">Analysis settings</h2>
     <div class="split">
       <div class="panel panel-lilac">
-        <h3 class="panel-title">Tones and pulses</h3>
-        <p>Each cluster has its own tone, so you can tell groups apart the way you tell tones apart on a hearing test.</p>
-        <p class="hint">Faster pulses mean faster motion. Slow clusters tap more slowly. The tone itself stays that cluster's note. Toward or away from the Point of Audio bends the pitch.</p>
+        <h3 class="panel-title">One tone for each video</h3>
+        <p>Each video uses one tone, not a different tone for each cluster. The pulse is the beat. Pitch rises when something moves toward the Point of Audio, and falls when it moves away. Volume tells how far away something is. Left and right computer speakers tell direction. Surround-sound headphones give a two-dimensional sense of where the motion is.</p>
       </div>
       <div class="panel panel-mint">
         <label class="panel-title" for="clusters">Number of clusters</label>

@@ -163,6 +163,9 @@ function playRecording(url, options) {
       if (!buffer) return 0;
       const played = source ? (ctx.currentTime - startedAt) * rate : 0;
       return Math.min(1, (offset + Math.max(0, played)) / buffer.duration);
+    },
+    duration: function () {
+      return buffer ? buffer.duration : 0;
     }
   };
 }

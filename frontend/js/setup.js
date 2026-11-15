@@ -62,6 +62,14 @@ function fitPreview() {
   }
 }
 
+function paintMark() {
+  const scale = markScale();
+  crosshair.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ") scale(" + scale + ")");
+  const where = placeWords(poa.x, poa.y);
+  previewTitle.textContent = "First video frame with " + frame.cells.length + " cell nuclei. The Point of Audio is at the " + where + ", x " + poa.x + ", y " + poa.y + ". Tap or drag to move it.";
+  document.getElementById("preview").setAttribute("aria-label", previewTitle.textContent);
+}
+
 function draw() {
   fitPreview();
   const scale = markScale();
@@ -76,10 +84,7 @@ function draw() {
     dot.setAttribute("stroke-width", String(2 * scale));
     cellDots.appendChild(dot);
   });
-  crosshair.setAttribute("transform", "translate(" + poa.x + " " + poa.y + ") scale(" + scale + ")");
-  const where = placeWords(poa.x, poa.y);
-  previewTitle.textContent = "First video frame with " + frame.cells.length + " cell nuclei. The Point of Audio is at the " + where + ", x " + poa.x + ", y " + poa.y + ".";
-  document.getElementById("preview").setAttribute("aria-label", previewTitle.textContent);
+  paintMark();
   legend.textContent = "First frame, " + frame.width + " × " + frame.height + " pixels";
 }
 
@@ -101,7 +106,7 @@ function moveTo(x, y, word, quiet) {
   poa.y = clamp(y, frame.height);
   xInput.value = String(poa.x);
   yInput.value = String(poa.y);
-  draw();
+  paintMark();
   if (!quiet) say(positionSentence(word));
 }
 
@@ -111,7 +116,7 @@ function scheduleMove() {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return;
   poa.x = clamp(x, frame.width);
   poa.y = clamp(y, frame.height);
-  draw();
+  paintMark();
   clearTimeout(announceTimer);
   announceTimer = setTimeout(function () {
     say(positionSentence(""));
@@ -183,8 +188,38 @@ document.getElementById("reset").addEventListener("click", function () {
   say("Settings reset to defaults. " + positionSentence(""));
 });
 
-document.getElementById("run").addEventListener("click", function () {
+function waitUntilDone(job) {
+  return getJob(job).then(function poll(data) {
+    if (data.status === "error") {
+      throw new Error(data.message || "The analysis could not finish.");
+    }
+    if (data.status === "done") return data;
+    return new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve(getJob(job).then(poll));
+      }, 500);
+    });
+  });
+}
+
+function jobsForThisPoint() {
   const job = currentJobId() || "a1b2c3";
+  let stored = "";
+  try {
+    stored = sessionStorage.getItem("cellsound-batch") || "";
+  } catch (error) {
+    stored = "";
+  }
+  if (!stored) return Promise.resolve([job]);
+  return getBatch(stored).then(function (data) {
+    const ids = (data.videos || []).map(function (video) { return video.job_id; }).filter(Boolean);
+    return ids.length ? ids : [job];
+  }).catch(function () {
+    return [job];
+  });
+}
+
+document.getElementById("run").addEventListener("click", function () {
   const body = analysisBody();
   runError.hidden = true;
   document.getElementById("run").disabled = true;
@@ -192,34 +227,82 @@ document.getElementById("run").addEventListener("click", function () {
   try {
     sessionStorage.setItem("cellsound-analysis", JSON.stringify(body));
   } catch (error) {
-    /* The next page can still load the mock summary. */
+    /* The next page can still load the saved summary. */
   }
-  analyzeJob(job, body).then(function () {
-    setJobId(job);
-    return getJob(job);
-  }).then(function poll(data) {
-    if (data.status === "error") {
-      document.getElementById("run").disabled = false;
-      runError.hidden = false;
-      runError.textContent = data.message || "The analysis could not finish.";
-      say(runError.textContent);
-      return null;
-    }
-    if (data.status !== "done") {
-      return new Promise(function (resolve) {
-        setTimeout(function () {
-          resolve(getJob(job).then(poll));
-        }, 500);
+  jobsForThisPoint().then(function (ids) {
+    let chain = Promise.resolve();
+    ids.forEach(function (id, index) {
+      chain = chain.then(function () {
+        say("Running the analysis for video " + (index + 1) + " of " + ids.length + ". The same Point of Audio is used for each video.");
+        return analyzeJob(id, body).then(function () {
+          return waitUntilDone(id);
+        });
       });
-    }
+    });
+    return chain.then(function () {
+      return ids[0];
+    });
+  }).then(function (firstId) {
+    setJobId(firstId);
     window.location.href = hrefWithJob("analysis.html");
-    return null;
   }).catch(function (error) {
     document.getElementById("run").disabled = false;
     runError.hidden = false;
     runError.textContent = error.message;
     say(error.message);
   });
+});
+
+const preview = document.getElementById("preview");
+let dragging = false;
+
+function pointFromEvent(event) {
+  const matrix = preview.getScreenCTM();
+  if (!matrix) return null;
+  const point = preview.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  const local = point.matrixTransform(matrix.inverse());
+  return { x: local.x, y: local.y };
+}
+
+preview.addEventListener("pointerdown", function (event) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const spot = pointFromEvent(event);
+  if (!spot) return;
+  dragging = true;
+  preview.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  moveTo(spot.x, spot.y, "", true);
+});
+
+preview.addEventListener("pointermove", function (event) {
+  if (!dragging) return;
+  const spot = pointFromEvent(event);
+  if (!spot) return;
+  moveTo(spot.x, spot.y, "", true);
+});
+
+function finishDrag() {
+  if (!dragging) return;
+  dragging = false;
+  say(positionSentence(""));
+}
+
+preview.addEventListener("pointerup", finishDrag);
+preview.addEventListener("pointercancel", finishDrag);
+
+preview.addEventListener("keydown", function (event) {
+  const moves = {
+    ArrowUp: [0, -1, "up"],
+    ArrowDown: [0, 1, "down"],
+    ArrowLeft: [-1, 0, "left"],
+    ArrowRight: [1, 0, "right"]
+  };
+  const move = moves[event.key];
+  if (!move) return;
+  event.preventDefault();
+  moveTo(poa.x + move[0] * stepSize(), poa.y + move[1] * stepSize(), move[2]);
 });
 
 const pauseButton = document.querySelector("[data-pause-mirror]");
@@ -242,6 +325,7 @@ getFrame0(jobId).then(function (data) {
   yInput.max = String(frame.height);
   xInput.previousElementSibling.textContent = "X (0–" + frame.width + ")";
   yInput.previousElementSibling.textContent = "Y (0–" + frame.height + ")";
+  draw();
   moveTo(frame.width / 2, frame.height / 2, "");
 }).catch(function (error) {
   say(error.message);

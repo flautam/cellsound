@@ -9,11 +9,19 @@ const mockRun = {
 };
 
 function readBody(response) {
-  return response.json().catch(function () {
-    return {};
-  }).then(function (data) {
+  return response.text().then(function (text) {
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = {};
+    }
     if (!response.ok) {
-      const error = new Error(data.message || "The server could not finish that request.");
+      let message = data.message;
+      if (!message && (response.status === 404 || response.status === 405)) {
+        message = "This page can show the site, but the analysis program is not running here. Processing works at http://127.0.0.1:8000/ on the computer that starts the server.";
+      }
+      const error = new Error(message || "The server could not finish that request.");
       error.code = data.error || "";
       throw error;
     }
@@ -31,7 +39,7 @@ function createJob(formData) {
     mockRun.started = true;
     return mockFile("job");
   }
-  return fetch("/api/jobs", { method: "POST", body: formData }).then(readBody);
+  return fetch(apiPath("/api/jobs"), { method: "POST", body: formData }).then(readBody);
 }
 
 function getJob(jobId) {
@@ -51,58 +59,58 @@ function getJob(jobId) {
       };
     });
   }
-  return fetch("/api/jobs/" + encodeURIComponent(jobId)).then(readBody);
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId))).then(readBody);
 }
 
 function getFrame0(jobId) {
   if (USE_MOCK) {
     return mockFile("frame0");
   }
-  return fetch("/api/jobs/" + encodeURIComponent(jobId) + "/frame0").then(readBody);
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/frame0")).then(readBody);
 }
 
 function getSummary(jobId) {
   if (USE_MOCK) return mockFile("summary");
-  return fetch("/api/jobs/" + encodeURIComponent(jobId) + "/summary").then(readBody);
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/summary")).then(readBody);
 }
 
 function getTraces(jobId) {
   if (USE_MOCK) return mockFile("traces");
-  return fetch("/api/jobs/" + encodeURIComponent(jobId) + "/traces").then(readBody);
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/traces")).then(readBody);
 }
 
 function downloadExport(jobId, include) {
   const query = include.join(",");
   if (USE_MOCK) return Promise.resolve(null);
-  return fetch("/api/jobs/" + encodeURIComponent(jobId) + "/export.zip?include=" + encodeURIComponent(query)).then(function (response) {
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/export.zip?include=" + encodeURIComponent(query))).then(function (response) {
     if (!response.ok) throw new Error("The download could not start.");
     return response.blob();
   });
 }
 
 function frameImageUrl(jobId) {
-  return "/api/jobs/" + encodeURIComponent(jobId) + "/frame0.png";
+  return apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/frame0.png");
 }
 
 function frameStepUrl(jobId, index, template) {
   const number = String(index);
   if (template) return String(template).replace("{index}", number);
-  return "/api/jobs/" + encodeURIComponent(jobId) + "/frames/" + encodeURIComponent(number) + ".jpg";
+  return apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/frames/" + encodeURIComponent(number) + ".jpg");
 }
 
 function audioUrl(jobId, name) {
   const file = String(name || "").replace(/\.wav$/, "");
-  return "/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav";
+  return apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav");
 }
 
 function createBatch(formData) {
   if (USE_MOCK) return mockFile("batch");
-  return fetch("/api/batches", { method: "POST", body: formData }).then(readBody);
+  return fetch(apiPath("/api/batches"), { method: "POST", body: formData }).then(readBody);
 }
 
 function getBatch(batchId) {
   if (USE_MOCK) return mockFile("batch");
-  return fetch("/api/batches/" + encodeURIComponent(batchId)).then(readBody);
+  return fetch(apiPath("/api/batches/" + encodeURIComponent(batchId))).then(readBody);
 }
 
 function analyzeJob(jobId, body) {
@@ -112,7 +120,45 @@ function analyzeJob(jobId, body) {
     mockRun.started = true;
     return mockFile("analyze");
   }
-  return fetch("/api/jobs/" + encodeURIComponent(jobId) + "/analyze", {
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/analyze"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(readBody);
+}
+
+const CODER_APP_ORIGIN = "https://8000--main--cellsound--flautam.coder.c1.workshop.cdr.dev";
+
+function apiPath(path) {
+  const selected = window.cellsound && window.cellsound.select;
+  let base = selected ? String(selected).replace(/\/$/, "") : "";
+  if (!base && window.location) {
+    const host = window.location.host;
+    if (host === "cellsound.select" || host === "www.cellsound.select") {
+      base = CODER_APP_ORIGIN;
+    }
+  }
+  return base + path;
+}
+
+function getMotionTypes(jobId) {
+  if (USE_MOCK) return mockFile("motion_types");
+  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/motion-types")).then(readBody);
+}
+
+function getSorter() {
+  if (USE_MOCK) {
+    return Promise.resolve({
+      configured: true,
+      message: "Ask a question to sort these videos by behavior. For example: show videos where cells move up."
+    });
+  }
+  return fetch(apiPath("/api/sort")).then(readBody);
+}
+
+function sortVideos(body) {
+  if (USE_MOCK) return mockFile("sort");
+  return fetch(apiPath("/api/sort"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)

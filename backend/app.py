@@ -11,8 +11,11 @@ Open http://127.0.0.1:8000/
 from __future__ import annotations
 
 import json
+import os
 import threading
 import traceback
+import urllib.error
+import urllib.request
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -23,6 +26,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -41,6 +45,18 @@ _lock = threading.Lock()
 _gpu = threading.Lock()
 
 app = FastAPI(title="cellsound")
+# Pages on cellsound.select call this server on another host. Same-origin
+# use (this process, or a laptop on 127.0.0.1) does not need these origins.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://cellsound.select",
+        "https://www.cellsound.select",
+        "https://8000--main--cellsound--flautam.coder.c1.workshop.cdr.dev",
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"],
+)
 
 
 def _job_dir(job_id: str) -> Path:
@@ -379,6 +395,10 @@ def analyze(job_id: str, body: dict):
         _attach_frames(job_id, traces)
         traces_path.write_text(json.dumps(traces, indent=2))
     (folder / "settings.json").write_text(json.dumps(body))
+    try:
+        write_motion_types(folder)
+    except Exception:
+        traceback.print_exc()
     _write_meta(job_id, status="done", stage="done", message="Analysis finished")
     return {"status": "done"}
 
@@ -697,6 +717,170 @@ def batch_status(batch_id: str):
     if payload is None:
         return JSONResponse(status_code=404, content={"error": "missing_batch", "message": "That group of videos was not found."})
     return _batch_view(payload)
+
+
+def _safe_job_id(job_id: str) -> bool:
+    if not job_id or len(job_id) > 64:
+        return False
+    return all(char.isalnum() or char in "-_" for char in job_id)
+
+
+def _sorter_message(configured: bool) -> str:
+    if configured:
+        return "Ask a question to sort these videos by behavior. For example: show videos where cells move up."
+    return "Sorting is unavailable because the server has no API key. Videos stay in their current order, with their behavior labels."
+
+
+@app.get("/api/jobs/{job_id}/motion-types")
+def motion_types(job_id: str):
+    if not _safe_job_id(job_id):
+        return JSONResponse(status_code=404, content={"error": "missing_job", "message": "That analysis was not found."})
+    missing = _missing(job_id)
+    if missing:
+        return missing
+    folder = _job_dir(job_id)
+    path = folder / "motion_types.json"
+    if not path.exists() and all((folder / name).exists() for name in ("summary.json", "motion.csv", "tracks.csv")):
+        try:
+            write_motion_types(folder)
+        except Exception:
+            traceback.print_exc()
+    if not path.exists():
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_ready", "message": "Finish cell tracing before behavior labels are available."},
+        )
+    return json.loads(path.read_text())
+
+
+@app.get("/api/sort")
+def sort_status():
+    configured = bool(os.environ.get("XAI_API_KEY", "").strip())
+    return {"configured": configured, "message": _sorter_message(configured)}
+
+
+def _labels_for_sort(job_id: str, name: str) -> dict:
+    path = _job_dir(job_id) / "motion_types.json"
+    behaviors = []
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            data = {}
+        for cluster in data.get("clusters") or []:
+            behaviors.append(
+                {
+                    "main_type": cluster.get("main_type"),
+                    "search_types": cluster.get("search_types") or [],
+                    "n_cells": cluster.get("n_cells"),
+                    "description": cluster.get("description") or "",
+                }
+            )
+    return {"job_id": job_id, "name": name, "behaviors": behaviors}
+
+
+def _parse_json_object(text: str) -> dict:
+    cleaned = (text or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1]
+        fence = cleaned.rfind("```")
+        if fence >= 0:
+            cleaned = cleaned[:fence]
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("The sorter did not return a list.")
+    parsed = json.loads(cleaned[start : end + 1])
+    if not isinstance(parsed, dict):
+        raise ValueError("The sorter did not return a list.")
+    return parsed
+
+
+def _ask_grok(key: str, question: str, videos: list) -> tuple[list, str]:
+    model = os.environ.get("XAI_MODEL", "grok-4-fast").strip() or "grok-4-fast"
+    payload = {
+        "model": model,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You sort cell-microscopy videos using only the behavior labels in the user message. "
+                    "You do not receive video files. Reply with one JSON object and nothing else, shaped as "
+                    '{"job_ids": ["id", "..."], "reason": "one sentence"}. '
+                    "Use each given job id exactly once. Put videos that match the question first."
+                ),
+            },
+            {"role": "user", "content": json.dumps({"question": question, "videos": videos})},
+        ],
+    }
+    request = urllib.request.Request(
+        "https://api.x.ai/v1/chat/completions",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            raw = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError("sorter request failed") from exc
+    text = raw["choices"][0]["message"]["content"]
+    parsed = _parse_json_object(text)
+    ids = parsed.get("job_ids")
+    if not isinstance(ids, list):
+        raise RuntimeError("sorter JSON missing job_ids")
+    reason = parsed.get("reason") if isinstance(parsed.get("reason"), str) else ""
+    return [str(item) for item in ids], reason
+
+
+@app.post("/api/sort")
+def sort_videos(body: dict):
+    question = str((body or {}).get("question") or "").strip()
+    if not question:
+        return JSONResponse(status_code=400, content={"error": "empty_question", "message": "Type a question before sorting."})
+    question = question[:500]
+    raw = (body or {}).get("videos") or []
+    if not isinstance(raw, list) or not raw:
+        return JSONResponse(status_code=400, content={"error": "no_videos", "message": "There are no videos to sort."})
+    videos = []
+    order = []
+    for item in raw[:MAX_BATCH]:
+        if not isinstance(item, dict):
+            continue
+        job_id = str(item.get("job_id") or "")
+        if not _safe_job_id(job_id):
+            continue
+        name = str(item.get("name") or job_id)[:200]
+        videos.append(_labels_for_sort(job_id, name))
+        order.append(job_id)
+    if not videos:
+        return JSONResponse(status_code=400, content={"error": "no_videos", "message": "There are no videos to sort."})
+    key = os.environ.get("XAI_API_KEY", "").strip()
+    if not key:
+        return {
+            "configured": False,
+            "job_ids": order,
+            "reason": _sorter_message(False),
+        }
+    try:
+        ordered, reason = _ask_grok(key, question, videos)
+    except Exception:
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=502,
+            content={"error": "sort_failed", "message": "Sorting could not finish. Videos stay in their current order."},
+        )
+    cleaned = [job_id for job_id in ordered if job_id in order]
+    for job_id in order:
+        if job_id not in cleaned:
+            cleaned.append(job_id)
+    sentence = " ".join(reason.split())
+    if len(sentence) > 280:
+        sentence = sentence[:277].rstrip() + "..."
+    if not sentence:
+        sentence = "Videos are ordered to match your question."
+    return {"configured": True, "job_ids": cleaned, "reason": sentence}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")
