@@ -557,41 +557,159 @@ def clusters_map(job_id: str):
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
-@app.get("/api/jobs/{job_id}/export.zip")
-def export_zip(job_id: str, include: str = "audio,text,data,settings"):
+def _export_slug(label: str, job_id: str) -> str:
+    """Folder-safe video name for export zip paths."""
+    stem = Path(str(label or "").strip()).stem or str(job_id)
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._")
+    return cleaned[:80] or str(job_id)
+
+
+def _job_display_name(job_id: str) -> str:
+    """Prefer the original upload filename from a batch record."""
+    if BATCHES.exists():
+        for path in BATCHES.glob("*/batch.json"):
+            try:
+                payload = json.loads(path.read_text())
+            except Exception:
+                continue
+            for item in payload.get("videos") or []:
+                if item.get("job_id") == job_id and item.get("name"):
+                    return str(item["name"])
+    return job_id
+
+
+def _add_job_to_export(archive: zipfile.ZipFile, job_id: str, wanted: set[str], root: str) -> bool:
+    """Write one job's selected files under root/. Returns False if not ready."""
     folder = _job_dir(job_id)
     if not (folder / "summary.json").exists():
-        return JSONResponse(status_code=404, content={"error": "not_ready", "message": "Run the analysis before downloading."})
+        return False
+    prefix = root.strip("/") + "/" if root else ""
+    summary_json = json.loads((folder / "summary.json").read_text())
+
+    if "text" in wanted:
+        overview = (summary_json.get("overview") or {}).get("description") or (
+            (summary_json.get("population") or {}).get("description") or ""
+        )
+        video_label = _job_display_name(job_id)
+        lines = [f"Video: {video_label}", "", "Video overview", overview, "", "Chunks"]
+        clusters = sorted(
+            summary_json.get("clusters") or [],
+            key=lambda row: int(row.get("cluster_id") or 0),
+        )
+        for cluster in clusters:
+            cid = cluster.get("cluster_id")
+            name = cluster.get("name") or ""
+            desc = cluster.get("description") or ""
+            tech = cluster.get("description_tech") or ""
+            header = f"Chunk {cid} (rank {cluster.get('rank', '?')}): {name}".strip()
+            lines.append(header)
+            if desc:
+                lines.append(desc)
+            if tech:
+                lines.append(tech)
+            lines.append("")
+            chunk_lines = [f"Video: {video_label}", header, "", desc]
+            if tech:
+                chunk_lines.extend(["", tech])
+            archive.writestr(
+                f"{prefix}descriptions/chunk_{cid}.txt",
+                "\n".join(chunk_lines).strip() + "\n",
+            )
+        archive.writestr(f"{prefix}descriptions/overview.txt", f"Video: {video_label}\n\n{overview}\n")
+        archive.writestr(f"{prefix}descriptions/summary.txt", "\n".join(lines).rstrip() + "\n")
+        archive.write(folder / "summary.json", f"{prefix}descriptions/summary.json")
+
+    # "data" keeps older clients working; newer UI sends the split keys below.
+    want_tracks = "tracks" in wanted or "data" in wanted
+    want_chunks_csv = "chunks_csv" in wanted or "data" in wanted
+    want_tracking_video = "tracking_video" in wanted or "data" in wanted
+    want_overview_video = "overview_video" in wanted or "data" in wanted
+    want_map = "map" in wanted or "data" in wanted
+
+    if want_tracks:
+        for name in ("tracks.csv", "motion.csv"):
+            path = folder / name
+            if path.exists():
+                archive.write(path, f"{prefix}data/{name}")
+
+    if want_chunks_csv:
+        for name in (
+            "clusters.csv",
+            "cluster_summary.csv",
+            "cluster_analysis.csv",
+            "cluster_timeseries.csv",
+        ):
+            path = folder / name
+            if path.exists():
+                archive.write(path, f"{prefix}data/{name}")
+        tmp = folder / "_chunk_tmp"
+        if tmp.exists():
+            for csv_path in sorted(tmp.glob("*.csv")):
+                archive.write(csv_path, f"{prefix}data/chunks/{csv_path.name}")
+
+    if want_tracking_video and (folder / "tracked.mp4").exists():
+        archive.write(folder / "tracked.mp4", f"{prefix}videos/tracked.mp4")
+
+    if want_overview_video:
+        if (folder / "clusters_overlay.mp4").exists():
+            archive.write(folder / "clusters_overlay.mp4", f"{prefix}videos/overview_clusters.mp4")
+            archive.write(folder / "clusters_overlay.mp4", f"{prefix}data/clusters_overlay.mp4")
+        for chunk_video in sorted(folder.glob("chunk_*_overlay.mp4")):
+            archive.write(chunk_video, f"{prefix}videos/{chunk_video.name}")
+
+    if want_map and (folder / "clusters_map.png").exists():
+        archive.write(folder / "clusters_map.png", f"{prefix}maps/clusters_map.png")
+
+    if "settings" in wanted and (folder / "settings.json").exists():
+        archive.write(folder / "settings.json", f"{prefix}settings.json")
+    if "audio" in wanted and (folder / "sounds").exists():
+        for wav in (folder / "sounds").glob("*.wav"):
+            archive.write(wav, f"{prefix}sounds/{wav.name}")
+    return True
+
+
+@app.get("/api/jobs/{job_id}/export.zip")
+def export_zip(
+    job_id: str,
+    include: str = "audio,text,tracks,chunks_csv,tracking_video,overview_video,map,settings",
+    jobs: str = "",
+):
     wanted = {part.strip() for part in include.split(",") if part.strip()}
+    job_ids = [part.strip() for part in jobs.split(",") if part.strip()] if jobs else [job_id]
+    job_ids = [jid for jid in job_ids if _safe_job_id(jid)]
+    if not job_ids:
+        job_ids = [job_id] if _safe_job_id(job_id) else []
+    if not job_ids:
+        return JSONResponse(status_code=404, content={"error": "missing_job", "message": "That analysis was not found."})
+
+    # Keep folder names unique when two uploads share a filename.
+    used_slugs: set[str] = set()
+    planned: list[tuple[str, str]] = []
+    for jid in job_ids:
+        slug = _export_slug(_job_display_name(jid), jid)
+        base = slug
+        index = 2
+        while slug in used_slugs:
+            slug = f"{base}_{index}"
+            index += 1
+        used_slugs.add(slug)
+        planned.append((jid, slug))
+
     buffer = BytesIO()
+    packed = 0
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        if "text" in wanted:
-            summary_json = json.loads((folder / "summary.json").read_text())
-            overview = (summary_json.get("overview") or {}).get("description") or summary_json["population"]["description"]
-            lines = ["Video overview", overview, "", "Chunks"]
-            for cluster in summary_json.get("clusters", []):
-                lines.append(
-                    f"Chunk {cluster['cluster_id']} (rank {cluster.get('rank', '?')}): "
-                    f"{cluster.get('name', '')}. {cluster.get('description', '')}"
-                )
-            archive.writestr("descriptions/summary.txt", "\n".join(lines) + "\n")
-        if "data" in wanted and (folder / "tracks.csv").exists():
-            archive.write(folder / "tracks.csv", "data/tracks.csv")
-            if (folder / "motion.csv").exists():
-                archive.write(folder / "motion.csv", "data/motion.csv")
-            if (folder / "clusters.csv").exists():
-                archive.write(folder / "clusters.csv", "data/clusters.csv")
-            if (folder / "cluster_summary.csv").exists():
-                archive.write(folder / "cluster_summary.csv", "data/cluster_summary.csv")
-            if (folder / "cluster_analysis.csv").exists():
-                archive.write(folder / "cluster_analysis.csv", "data/cluster_analysis.csv")
-            if (folder / "clusters_overlay.mp4").exists():
-                archive.write(folder / "clusters_overlay.mp4", "data/clusters_overlay.mp4")
-        if "settings" in wanted and (folder / "settings.json").exists():
-            archive.write(folder / "settings.json", "settings.json")
-        if "audio" in wanted and (folder / "sounds").exists():
-            for wav in (folder / "sounds").glob("*.wav"):
-                archive.write(wav, f"sounds/{wav.name}")
+        for jid, slug in planned:
+            # One video → files under that video's folder so descriptions stay grouped.
+            if _add_job_to_export(archive, jid, wanted, slug):
+                packed += 1
+        if packed == 0:
+            return JSONResponse(status_code=404, content={"error": "not_ready", "message": "Run the analysis before downloading."})
+        if "text" in wanted and packed > 1:
+            index_lines = ["Descriptions by video", ""]
+            for jid, slug in planned:
+                if (_job_dir(jid) / "summary.json").exists():
+                    index_lines.append(f"- {slug}/descriptions/  ({_job_display_name(jid)})")
+            archive.writestr("descriptions_index.txt", "\n".join(index_lines) + "\n")
     return Response(
         content=buffer.getvalue(),
         media_type="application/zip",

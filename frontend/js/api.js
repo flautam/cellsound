@@ -79,11 +79,21 @@ function getTraces(jobId) {
   return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/traces")).then(readBody);
 }
 
-function downloadExport(jobId, include) {
+function downloadExport(jobId, include, jobIds) {
   const query = include.join(",");
   if (USE_MOCK) return Promise.resolve(null);
-  return fetch(apiPath("/api/jobs/" + encodeURIComponent(jobId) + "/export.zip?include=" + encodeURIComponent(query))).then(function (response) {
-    if (!response.ok) throw new Error("The download could not start.");
+  const ids = (jobIds && jobIds.length ? jobIds : [jobId]).filter(Boolean);
+  const primary = ids[0] || jobId;
+  let url = apiPath("/api/jobs/" + encodeURIComponent(primary) + "/export.zip?include=" + encodeURIComponent(query));
+  if (ids.length) {
+    url += "&jobs=" + encodeURIComponent(ids.join(","));
+  }
+  return fetch(url).then(function (response) {
+    if (!response.ok) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        throw new Error((body && body.message) || "The download could not start.");
+      });
+    }
     return response.blob();
   });
 }

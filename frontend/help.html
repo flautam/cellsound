@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Help — VoiceOver, NVDA, and accessibility — Cellsound</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="img/logo.png" type="image/png">
+</head>
+<body class="app theme-light size-1">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="site-header">
+  <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" alt="" width="32" height="32">Cellsound</a>
+  <div class="header-tools">
+    <div class="display-wrap">
+      <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M5 19 9.5 5h2L16 19h-2.2l-.9-2.6H8.1L7.2 19H5zm3.6-4.4h3.8L10.6 8.2 8.6 14.6zM18 19V8.5h-1.6L14 10v1.8l2.4-1.4H17V19H18z"></path></svg>Text size &amp; contrast<svg class="chevron" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div id="display-panel" class="display-panel" role="group" aria-label="Text size and contrast" hidden>
+        <div class="field">
+          <label for="text-size">Text size</label>
+          <select class="select" id="text-size">
+            <option value="1">Standard</option>
+            <option value="2">Larger</option>
+            <option value="3">Largest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contrast">Contrast</label>
+          <select class="select" id="contrast">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="hc">High contrast</option>
+          </select>
+        </div>
+        <label class="check-label" for="pause-animations">
+          <input type="checkbox" id="pause-animations"> Pause animations
+        </label>
+        <button type="button" class="done-btn" id="display-done">Done</button>
+      </div>
+    </div>
+    <a class="help-link" href="help.html" aria-current="page">Help</a>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+<div class="hero hero-sky">
+  <div class="mesh" aria-hidden="true"><i></i><i></i></div>
+  <div class="hero-inner">
+    <h1>Help &amp; accessibility</h1>
+    <p class="lede">How to use Cellsound with a screen reader, keyboard, and larger text. We design for WCAG 2.1 Level AA.</p>
+  </div>
+</div>
+
+<div class="page stack">
+  <section class="card" aria-labelledby="sr-h">
+    <h2 id="sr-h">How to use with VoiceOver (Mac)</h2>
+    <ol>
+      <li>Turn VoiceOver on with <kbd>Command</kbd> + <kbd>F5</kbd> (or Siri: “Turn on VoiceOver”).</li>
+      <li>Open Cellsound in Safari or Chrome, then press <kbd>Control</kbd> + <kbd>Option</kbd> + <kbd>A</kbd> to start reading, or <kbd>Control</kbd> + <kbd>Option</kbd> + <kbd>Right Arrow</kbd> to move item by item.</li>
+      <li>Use the Rotor (<kbd>Control</kbd> + <kbd>Option</kbd> + <kbd>U</kbd>) to jump by headings, links, form controls, or landmarks. Each page has a header, step navigation, and main region.</li>
+      <li>Press <kbd>Tab</kbd> for the “Skip to main content” link, then Enter to jump past the header.</li>
+      <li>On Upload, choose files with the file control, set calibration if you want, then activate “Start processing.” Status messages update live while frames track.</li>
+      <li>On Analysis settings, move the Point of Audio with the arrow buttons or by dragging; VoiceOver announces the new position in the preview label.</li>
+      <li>On Overview, each video is a toggle button. VoiceOver says whether it is selected. After sorting, a status line says how many videos matched; matches are also labeled “Match.”</li>
+      <li>On Detailed analysis, pick a chunk from the list, then “Play this chunk” to hear it. Volume is separate from system VoiceOver speech—lower app volume if speech is hard to hear.</li>
+      <li>On Export, choose which videos and which file types, then download the zip.</li>
+    </ol>
+  </section>
+
+  <section class="card" aria-labelledby="nvda-h">
+    <h2 id="nvda-h">How to use with NVDA (Windows)</h2>
+    <ol>
+      <li>Install <a href="https://www.nvaccess.org/download/">NVDA</a>, then start it. Browse Cellsound in Firefox or Chrome.</li>
+      <li>Press <kbd>Insert</kbd> + <kbd>Down Arrow</kbd> to say all, or use arrow keys to move by line. Press <kbd>H</kbd> / <kbd>Shift</kbd> + <kbd>H</kbd> for next/previous heading.</li>
+      <li>Press <kbd>D</kbd> for landmarks (header, navigation, main). Press <kbd>B</kbd> for buttons, <kbd>F</kbd> for form fields, <kbd>K</kbd> for links.</li>
+      <li><kbd>Tab</kbd> reaches “Skip to main content,” then interactive controls in order. Focus outlines stay visible.</li>
+      <li>Live regions announce tracking progress, sort results, and playback status without moving focus.</li>
+      <li>If NVDA speech overlaps Cellsound audio, pause NVDA with <kbd>Shift</kbd>, or lower “App volume” on Detailed analysis.</li>
+      <li>For the Point of Audio, use the on-screen nudge controls if dragging is awkward with the mouse pointer.</li>
+    </ol>
+  </section>
+
+  <section class="card" aria-labelledby="display-h">
+    <h2 id="display-h">Text size, contrast, and motion</h2>
+    <ul>
+      <li>Open <strong>Text size &amp; contrast</strong> in the header. Choose Standard, Larger, or Largest text.</li>
+      <li>Choose Light, Dark, or High contrast. High contrast uses yellow on black for strong edges.</li>
+      <li>Check <strong>Pause animations</strong> if motion is distracting. The site also respects your system “reduce motion” setting.</li>
+      <li>Browser zoom (for example 200–400%) should reflow content into a single column without cutting off buttons or labels.</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="wcag-h">
+    <h2 id="wcag-h">WCAG 2.1 Level AA</h2>
+    <p>We aim to meet the <a href="https://www.w3.org/WAI/WCAG21/quickref/?versions=2.1&amp;currentsidebar=%23col_customize&amp;levels=aa">W3C WCAG 2.1 Level AA</a> criteria that apply to this app. In practice that includes:</p>
+    <ul>
+      <li>Keyboard access to controls, with a visible focus indicator</li>
+      <li>Skip link, page titles, headings, and labeled form fields</li>
+      <li>Text alternatives for scientific frames (behavior descriptions as image alt text)</li>
+      <li>Status updates that screen readers can hear (live regions)</li>
+      <li>Contrast themes and resizable text that reflows</li>
+      <li>Not relying on color alone for sort matches (count text + “Match” labels)</li>
+      <li>Sonification and plain-language descriptions as non-visual ways to understand motion</li>
+    </ul>
+    <p>Known limits: silent overview videos do not yet include a separate audio-description track; exported WAV files do not yet ship a timed transcript. Text summaries and chunk sound still carry the meaning.</p>
+  </section>
+
+  <div class="flow">
+    <a class="btn btn-primary" href="index.html">Back to upload</a>
+    <a class="btn btn-line" id="back-job" href="overview.html">Back to overview</a>
+  </div>
+</div>
+</main>
+<script src="js/audio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script>
+  (function () {
+    const back = document.getElementById("back-job");
+    if (back && typeof hrefWithJob === "function") back.href = hrefWithJob("overview.html");
+  })();
+</script>
+</body>
+</html>

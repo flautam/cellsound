@@ -39,7 +39,7 @@
         <button type="button" class="done-btn" id="display-done">Done</button>
       </div>
     </div>
-    <a class="help-link" href="#help">Help</a>
+    <a class="help-link" href="help.html">Help</a>
   </div>
 </header>
 <nav class="steps" aria-label="Analysis steps">
@@ -69,15 +69,20 @@
     <form id="sort-form" class="sort-form">
       <div class="field">
         <label for="question">Ask to sort the videos</label>
-        <input class="text-input" id="question" name="question" type="text" autocomplete="off" aria-describedby="sort-hint">
+        <input class="text-input" id="question" name="question" type="text" autocomplete="off" aria-describedby="sort-hint sort-result">
       </div>
       <button type="submit" class="btn btn-primary" id="sort-videos">Sort videos</button>
     </form>
-    <p class="hint" id="sort-hint">Example: show videos where cells move up. Sorting matches up, down, left, and right in the behavior labels. Matching videos get a light green highlight.</p>
+    <p class="hint" id="sort-hint">Example: show videos where cells move up. Sorting matches up, down, left, and right in the main behavior. Matching videos are selected and marked “Match”; others are cleared.</p>
+    <p class="sort-result" id="sort-result" role="status" aria-live="polite" hidden></p>
   </section>
-  <section class="card" id="help" aria-labelledby="videos-h">
+  <section class="card" id="videos-section" aria-labelledby="videos-h">
     <h2 id="videos-h" tabindex="-1">Videos in this set</h2>
     <p class="hint" id="select-hint">Select one or more thumbnails to shortlist for detailed analysis. You can change the selection before continuing.</p>
+    <div class="flow select-tools" id="select-tools" hidden>
+      <button type="button" class="btn btn-line" id="select-all">Select all</button>
+      <button type="button" class="btn btn-line" id="deselect-all">Deselect all</button>
+    </div>
     <div id="empty" hidden>
       <p id="empty-text">Finish cell tracing and run analysis settings before this page can show summaries.</p>
       <p><a class="btn btn-primary" id="trace-link" href="setup.html">Go to analysis settings</a></p>
@@ -86,7 +91,6 @@
   </section>
   <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Loading videos.</p>
   <div class="flow">
-    <button type="button" class="btn btn-line" id="select-all">Select all</button>
     <button type="button" class="btn btn-primary" id="next-link">Continue to detailed analysis</button>
   </div>
 </div>

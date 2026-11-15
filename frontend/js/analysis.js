@@ -188,8 +188,15 @@ function showDetail() {
   document.getElementById("detail-h").textContent = "Chunk " + cluster.cluster_id + ": " + (cluster.name || "");
   document.getElementById("detail-meta").textContent =
     "~" + cluster.n_cells + " cells · rank " + cluster.rank + " of " + clusters.length;
-  document.getElementById("detail-desc").textContent = cluster.description || "";
+  const chunkDesc = cluster.description || "";
+  document.getElementById("detail-desc").textContent = chunkDesc;
   document.getElementById("cmp-caption").textContent = "Chunk " + cluster.cluster_id + " compared with the whole video";
+  if (chunkVideo) {
+    chunkVideo.setAttribute(
+      "aria-label",
+      "Video with only chunk " + cluster.cluster_id + " highlighted. " + chunkDesc
+    );
+  }
   document.getElementById("cmp-speed").textContent = plain(cluster.mean_speed, 1) + " " + units.speed;
   document.getElementById("all-speed").textContent = plain(pop.mean_speed, 1) + " " + units.speed;
   document.getElementById("cmp-along").textContent = signed(cluster.along_trend != null ? cluster.along_trend : 0, 2) + " " + units.speed;
@@ -252,8 +259,14 @@ function fillOverview() {
   const active = shortlist.find(function (video) { return video.job_id === activeJob; });
   document.getElementById("hero-lede").textContent =
     (active ? active.name + " · " : "") + (pop.n_cells || 0) + " cells in " + (pop.n_clusters || 0) + " chunks.";
-  document.getElementById("desc-text").textContent =
-    overview.description || pop.description || "No overview is ready yet.";
+  const overviewText = overview.description || pop.description || "No overview is ready yet.";
+  document.getElementById("desc-text").textContent = overviewText;
+  if (overviewVideo) {
+    overviewVideo.setAttribute(
+      "aria-label",
+      "Overview video showing all chunks, muted. " + overviewText
+    );
+  }
   const body = document.getElementById("stats-body");
   body.replaceChildren();
   const rows = [

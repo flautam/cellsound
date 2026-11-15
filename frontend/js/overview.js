@@ -6,8 +6,11 @@ const sortSection = document.getElementById("sort-section");
 const sortForm = document.getElementById("sort-form");
 const sortButton = document.getElementById("sort-videos");
 const questionInput = document.getElementById("question");
+const sortResult = document.getElementById("sort-result");
 const nextButton = document.getElementById("next-link");
 const selectAllButton = document.getElementById("select-all");
+const deselectAllButton = document.getElementById("deselect-all");
+const selectTools = document.getElementById("select-tools");
 
 let videos = [];
 let selected = {};
@@ -105,10 +108,6 @@ function render() {
     button.type = "button";
     button.className = "overview-select";
     button.setAttribute("aria-pressed", selected[video.job_id] ? "true" : "false");
-    button.setAttribute(
-      "aria-label",
-      (selected[video.job_id] ? "Selected. " : "Not selected. ") + video.name + ". Activate to toggle."
-    );
     const head = document.createElement("div");
     head.className = "overview-head";
     const heading = document.createElement("h3");
@@ -119,16 +118,30 @@ function render() {
     mark.textContent = selected[video.job_id] ? "✓" : "";
     head.appendChild(heading);
     head.appendChild(mark);
+    const behavior = video.behavior || "Behavior labels are not ready for this video yet.";
+    const matched = Boolean(matchIds[video.job_id]);
     const image = document.createElement("img");
     image.src = video.imageUrl;
-    image.alt = "";
+    image.alt = "First frame of " + video.name + ". " + behavior;
     image.width = 512;
     image.height = 512;
     const summary = document.createElement("p");
-    summary.textContent = video.behavior || "Behavior labels are not ready for this video yet.";
+    summary.textContent = behavior;
     button.appendChild(head);
+    if (matched) {
+      const tag = document.createElement("p");
+      tag.className = "match-tag";
+      tag.textContent = "Match";
+      button.appendChild(tag);
+    }
     button.appendChild(image);
     button.appendChild(summary);
+    button.setAttribute(
+      "aria-label",
+      (selected[video.job_id] ? "Selected. " : "Not selected. ")
+        + (matched ? "Match. " : "")
+        + video.name + ". " + behavior + " Activate to toggle."
+    );
     button.addEventListener("click", function () {
       selected[video.job_id] = !selected[video.job_id];
       render();
@@ -146,7 +159,7 @@ function showEmpty(message) {
   document.getElementById("empty-text").textContent = message;
   videoList.hidden = true;
   sortSection.hidden = true;
-  selectAllButton.hidden = true;
+  if (selectTools) selectTools.hidden = true;
   nextButton.hidden = true;
   say(message);
 }
@@ -218,6 +231,9 @@ sortForm.addEventListener("submit", function (event) {
     const hits = (result && result.matched_job_ids) || [];
     matchIds = {};
     hits.forEach(function (id) { matchIds[id] = true; });
+    videos.forEach(function (video) {
+      selected[video.job_id] = Boolean(matchIds[video.job_id]);
+    });
     if (order.length) {
       const byId = {};
       videos.forEach(function (video) { byId[video.job_id] = video; });
@@ -230,11 +246,19 @@ sortForm.addEventListener("submit", function (event) {
       });
       Object.keys(byId).forEach(function (id) { next.push(byId[id]); });
       videos = next;
-      render();
-    } else {
-      render();
     }
-    say((result && result.reason) || "Videos that match your search are highlighted in light green.");
+    render();
+    const matchCount = hits.length;
+    const total = videos.length;
+    if (sortResult) {
+      sortResult.hidden = false;
+      sortResult.textContent = matchCount + " of " + total + " videos match this search. Closest matches appear first.";
+    }
+    const base = (result && result.reason) || "Matching videos are marked Match.";
+    say(base + " " + matchCount + " of " + total + " match. Closest matches appear first."
+      + (matchCount
+        ? " Selected " + matchCount + " matching video" + (matchCount === 1 ? "" : "s") + "."
+        : " Cleared the selection because nothing matched."));
   }).catch(function (error) {
     sortButton.disabled = false;
     say(error.message || "Sorting could not finish. Videos stay in their current order.");
@@ -242,12 +266,19 @@ sortForm.addEventListener("submit", function (event) {
 });
 
 selectAllButton.addEventListener("click", function () {
-  const allOn = selectedCount() === videos.length;
   videos.forEach(function (video) {
-    selected[video.job_id] = !allOn;
+    selected[video.job_id] = true;
   });
   render();
-  say(allOn ? "Cleared the selection." : "Selected all videos.");
+  say("Selected all videos.");
+});
+
+deselectAllButton.addEventListener("click", function () {
+  videos.forEach(function (video) {
+    selected[video.job_id] = false;
+  });
+  render();
+  say("Cleared the selection.");
 });
 
 nextButton.addEventListener("click", function () {
@@ -285,7 +316,7 @@ loadCatalog().then(function (catalog) {
     emptyBox.hidden = true;
     videoList.hidden = false;
     sortSection.hidden = false;
-    selectAllButton.hidden = false;
+    if (selectTools) selectTools.hidden = false;
     nextButton.hidden = false;
     sortButton.disabled = false;
     render();

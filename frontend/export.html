@@ -39,7 +39,7 @@
         <button type="button" class="done-btn" id="display-done">Done</button>
       </div>
     </div>
-    <a class="help-link" href="#help">Help</a>
+    <a class="help-link" href="help.html">Help</a>
   </div>
 </header>
 <nav class="steps" aria-label="Analysis steps">
@@ -64,17 +64,30 @@
   </div>
 </div>
 <div class="page stack">
+  <fieldset class="include" id="video-pick" hidden>
+    <legend>Which videos</legend>
+    <p class="hint" id="video-pick-hint">Choose which finished videos go in the zip. Each selected video gets its own folder.</p>
+    <div class="opt-row" id="video-options"></div>
+    <div class="flow select-tools" style="margin-top:0.8em">
+      <button type="button" class="btn btn-line" id="videos-all">Select all videos</button>
+      <button type="button" class="btn btn-line" id="videos-none">Deselect all videos</button>
+    </div>
+  </fieldset>
   <fieldset class="include" id="help">
     <legend>What to include</legend>
     <div class="opt-row">
+      <label class="opt" style="background:var(--butter)"><input type="checkbox" id="inc-settings" value="settings" checked aria-describedby="d-set"><span><strong>Settings file</strong><p id="d-set">Point of Audio, calibration and cluster choices.</p></span></label>
+      <label class="opt" style="background:var(--butter)"><input type="checkbox" id="inc-text" value="text" checked aria-describedby="d-text"><span><strong>Descriptions (text)</strong><p id="d-text">Grouped by video: overview plus every chunk description in that video’s folder.</p></span></label>
+      <label class="opt" style="background:var(--mint)"><input type="checkbox" id="inc-tracks" value="tracks" checked aria-describedby="d-tracks"><span><strong>Cell-by-cell CSV</strong><p id="d-tracks">Each cell’s position and motion across frames (tracks and motion tables).</p></span></label>
+      <label class="opt" style="background:var(--sky)"><input type="checkbox" id="inc-chunks-csv" value="chunks_csv" checked aria-describedby="d-chunks-csv"><span><strong>Chunks CSV</strong><p id="d-chunks-csv">Chunk membership and summary tables for spreadsheets or code.</p></span></label>
+      <label class="opt" style="background:var(--peach)"><input type="checkbox" id="inc-tracking-video" value="tracking_video" checked aria-describedby="d-tracking-video"><span><strong>Overall tracking video</strong><p id="d-tracking-video">The full tracked clip for each video.</p></span></label>
+      <label class="opt" style="background:var(--lilac)"><input type="checkbox" id="inc-overview-video" value="overview_video" checked aria-describedby="d-overview-video"><span><strong>Chunk overview video</strong><p id="d-overview-video">All chunks drawn on the frames, plus any single-chunk overlay clips.</p></span></label>
+      <label class="opt" style="background:var(--mint)"><input type="checkbox" id="inc-map" value="map" checked aria-describedby="d-map"><span><strong>Chunk 2D map</strong><p id="d-map">The clusters map image for each video.</p></span></label>
       <label class="opt" style="background:var(--lilac)"><input type="checkbox" id="inc-audio" value="audio" checked aria-describedby="d-audio"><span><strong>Sound files (WAV)</strong><p id="d-audio">One file per chunk, plus short listening examples.</p></span></label>
-      <label class="opt" style="background:var(--butter)"><input type="checkbox" id="inc-text" value="text" checked aria-describedby="d-text"><span><strong>Descriptions (text)</strong><p id="d-text">Plain-language summaries, screen-reader friendly.</p></span></label>
-      <label class="opt" style="background:var(--mint)"><input type="checkbox" id="inc-data" value="data" checked aria-describedby="d-data"><span><strong>Data tables (CSV)</strong><p id="d-data">Tracks, motion and clusters for spreadsheets or code.</p></span></label>
-      <label class="opt" style="background:var(--peach);flex-basis:100%"><input type="checkbox" id="inc-settings" value="settings" checked aria-describedby="d-set"><span><strong>Settings file</strong><p id="d-set">Point of Audio, calibration and cluster choices.</p></span></label>
     </div>
   </fieldset>
   <div class="flow">
-    <button type="button" class="btn btn-primary" id="download"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg><span id="download-label">Download zip (4 items)</span></button>
+    <button type="button" class="btn btn-primary" id="download"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg><span id="download-label">Download zip (8 items)</span></button>
     <a class="btn btn-line" id="restart" href="index.html">Start a new analysis</a>
   </div>
   <div id="status" role="status" aria-live="polite" aria-atomic="true"></div>
