@@ -181,11 +181,17 @@ def _track(job_id: str, video_path: Path) -> None:
             width=width,
             height=height,
             fps=source_fps,
-            message="Detecting and tracking nuclei",
+            message="Tracking cells",
         )
 
         def on_frame(done, count):
-            _write_meta(job_id, frame=done, total_frames=count, stage="tracking")
+            _write_meta(
+                job_id,
+                frame=done,
+                total_frames=count,
+                stage="tracking",
+                message="Tracking cells frame " + str(done) + " of " + str(count),
+            )
 
         masks = segment_nuclei(video, device, on_frame=on_frame)
         table = link_tracks(video, masks)
@@ -281,7 +287,11 @@ async def create_job(
         width=0,
         height=0,
     )
-    threading.Thread(target=_track, args=(job_id, video_path), daemon=True).start()
+    def _run():
+        with _gpu:
+            _track(job_id, video_path)
+
+    threading.Thread(target=_run, daemon=True).start()
     return {"job_id": job_id}
 
 
@@ -626,7 +636,15 @@ def _batch_view(payload: dict) -> dict:
                 "status": item.get("status") or "queued",
                 "frame": int(meta.get("frame") or 0),
                 "total_frames": int(meta.get("total_frames") or 0),
-                "message": item.get("message") or meta.get("message") or "",
+                # Prefer live job meta while this video is running so the UI
+                # shows frame progress instead of the stale batch queue note.
+                "message": (
+                    meta.get("message")
+                    if (item.get("status") or "") == "running"
+                    else item.get("message")
+                )
+                or meta.get("message")
+                or "",
             }
         )
     states = [video["status"] for video in videos]
@@ -909,12 +927,12 @@ def _video_profile(behaviors: list) -> tuple[str, set[str]]:
 
 
 def _match_rank(main: str, found: set[str], asked: list[str]) -> tuple[int, int, int] | None:
-    overlap = [name for name in asked if name in found]
-    if not overlap:
+    """Match only the video's main behavior (what Overview shows), not side groups."""
+    del found  # kept for call-site compatibility; secondary labels do not match
+    if not main or main not in asked:
         return None
-    main_hit = 1 if main in overlap else 0
-    earliest = min(asked.index(name) for name in overlap)
-    return (len(overlap), main_hit, -earliest)
+    earliest = asked.index(main)
+    return (1, 1, -earliest)
 
 
 def _direction_phrase(names: list[str]) -> str:
@@ -969,8 +987,23 @@ def sort_videos(body: dict):
     matched.sort(key=lambda row: (-row[0][0], -row[0][1], -row[0][2], row[1]))
     missed.sort(key=lambda row: row[1])
     ordered = [row[2] for row in matched + missed]
-    reason = _sort_reason(asked, [row[3] for row in matched])
-    return {"configured": True, "job_ids": ordered, "reason": reason}
+    matched_ids = [row[2] for row in matched]
+    matched_mains: list[set[str]] = []
+    for _rank, _index, job_id, _found in matched:
+        for video in videos:
+            if video["job_id"] != job_id:
+                continue
+            main, _ = _video_profile(video["behaviors"])
+            if main:
+                matched_mains.append({main})
+            break
+    reason = _sort_reason(asked, matched_mains)
+    return {
+        "configured": True,
+        "job_ids": ordered,
+        "matched_job_ids": matched_ids,
+        "reason": reason,
+    }
 
 
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")

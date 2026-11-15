@@ -342,14 +342,24 @@ body{overflow-x:hidden}
 .overview-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:1em}
 .overview-card{flex:1 1 16em;max-width:24em;display:flex;flex-direction:column;gap:0.6em;margin:0;padding:0;border:3px solid var(--hair);border-radius:4px;background:var(--bg);overflow:hidden}
 .overview-card.is-selected{border-color:var(--primary);box-shadow:0 0.25em 0 var(--line)}
-.overview-card.is-match{border-color:#1f7a3a;box-shadow:0 0 0 2px rgba(31,122,58,0.25)}
-.overview-card.is-match.is-selected{border-color:#1f7a3a;box-shadow:0 0.25em 0 #1f7a3a}
-.sort-card{border-color:#1f7a3a;box-shadow:0 0 0 2px rgba(31,122,58,0.18)}
+.overview-card.is-match{background:#e7f6ec}
+.overview-card.is-match .overview-select img{outline:3px solid rgba(31,122,58,0.35);outline-offset:-3px}
+.overview-card.is-match.is-selected{border-color:var(--primary);background:#e7f6ec}
+.sort-card{border-color:#1f7a3a}
 .sort-card .text-input:focus{outline-color:#1f7a3a;border-color:#1f7a3a}
+.sort-form{display:flex;flex-direction:column;align-items:flex-start;gap:0.85em;margin:0}
+.sort-form .field{width:100%}
+.sort-form .btn{margin:0;position:static}
 .overview-select{font:inherit;color:inherit;text-align:left;display:flex;flex-direction:column;gap:0.6em;width:100%;margin:0;padding:0.8em;border:0;background:transparent;cursor:pointer}
 .overview-select img{width:100%;height:auto;display:block;background:var(--header);border-radius:4px}
-.overview-select h3,.overview-select p{margin:0}
-.overview-check{align-self:flex-end;display:grid;place-items:center;width:1.8em;height:1.8em;border:3px solid var(--line);border-radius:4px;background:var(--surface);font-weight:700;color:var(--primary)}
+.overview-player{display:flex;flex-direction:column;gap:0.7em}
+.overview-player video{width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)}
+.overview-controls{display:flex;flex-wrap:wrap;align-items:center;gap:0.75em 1em}
+.overview-time{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.overview-head{display:flex;align-items:flex-start;gap:0.55em;width:100%}
+.overview-select h3{margin:0;flex:1 1 auto;min-width:0;overflow-wrap:anywhere;word-break:break-word;line-height:1.25}
+.overview-select p{margin:0}
+.overview-check{flex:none;display:grid;place-items:center;width:1.8em;height:1.8em;border:3px solid var(--line);border-radius:4px;background:var(--surface);font-weight:700;color:var(--primary)}
 .overview-card.is-selected .overview-check{background:var(--primary);color:var(--on-header);border-color:var(--line)}
 .batch-checks{gap:1.2em}
 .batch-item{display:flex;flex-direction:column;gap:0.5em;padding:0.8em;border:2px solid var(--hair);border-radius:4px;background:var(--surface)}

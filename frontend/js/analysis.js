@@ -4,6 +4,10 @@ const playButton = document.getElementById("play");
 const playLabel = document.getElementById("play-label");
 const playIcon = document.getElementById("play-icon");
 const overviewVideo = document.getElementById("overview-video");
+const overviewPlay = document.getElementById("overview-play");
+const overviewPlayLabel = document.getElementById("overview-play-label");
+const overviewPlayIcon = document.getElementById("overview-play-icon");
+const overviewTime = document.getElementById("overview-time");
 const chunkVideo = document.getElementById("chunk-video");
 const chunkDetail = document.getElementById("chunk-detail");
 const chunkPicks = document.getElementById("chunk-picks");
@@ -20,6 +24,27 @@ let playing = false;
 let tone = null;
 let scrubbing = false;
 let cueTimer = null;
+
+function formatClock(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return mins + ":" + String(secs).padStart(2, "0");
+}
+
+function updateOverviewTime() {
+  if (!overviewTime || !overviewVideo) return;
+  const current = formatClock(overviewVideo.currentTime);
+  const duration = formatClock(overviewVideo.duration || 0);
+  overviewTime.textContent = current + " / " + duration;
+}
+
+function setOverviewPlaying(on) {
+  if (!overviewPlayLabel || !overviewPlayIcon) return;
+  overviewPlayLabel.textContent = on ? "Pause overview" : "Play overview";
+  overviewPlayIcon.setAttribute("d", on ? "M6 4h4v16H6zM14 4h4v16h-4z" : "M7 4v16l13-8z");
+  if (overviewPlay) overviewPlay.setAttribute("aria-pressed", on ? "true" : "false");
+}
 
 function say(text) {
   if (statusText && statusText.textContent !== text) statusText.textContent = text;
@@ -250,8 +275,11 @@ function fillOverview() {
   });
   const trust = summary.reliability || {};
   document.getElementById("trust-note").textContent = trust.note || "Tracking finished.";
+  overviewVideo.pause();
+  setOverviewPlaying(false);
   overviewVideo.src = apiPath("/api/jobs/" + encodeURIComponent(activeJob) + "/clusters_overlay.mp4?v=" + Date.now());
   overviewVideo.load();
+  updateOverviewTime();
   document.getElementById("export-link").href = hrefWithJob("export.html");
   const overviewLink = document.getElementById("overview-link");
   if (overviewLink) overviewLink.href = hrefWithJob("overview.html");
@@ -343,6 +371,32 @@ function getBatchNames() {
   }).catch(function () {
     return {};
   });
+}
+
+if (overviewPlay && overviewVideo) {
+  overviewPlay.addEventListener("click", function () {
+    if (!overviewVideo.src) return;
+    if (overviewVideo.paused) {
+      const play = overviewVideo.play();
+      if (play && play.catch) {
+        play.catch(function () {
+          setOverviewPlaying(false);
+          say("The overview video could not play.");
+        });
+      }
+    } else {
+      overviewVideo.pause();
+    }
+  });
+  overviewVideo.addEventListener("play", function () { setOverviewPlaying(true); });
+  overviewVideo.addEventListener("pause", function () { setOverviewPlaying(false); });
+  overviewVideo.addEventListener("ended", function () {
+    setOverviewPlaying(false);
+    updateOverviewTime();
+  });
+  overviewVideo.addEventListener("timeupdate", updateOverviewTime);
+  overviewVideo.addEventListener("loadedmetadata", updateOverviewTime);
+  overviewVideo.addEventListener("durationchange", updateOverviewTime);
 }
 
 playButton.addEventListener("click", function () {

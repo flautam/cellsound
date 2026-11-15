@@ -114,7 +114,9 @@ def link_tracks(video, masks):
     Returns a table with columns cell_id, frame, x, y.
     Coordinates are the nucleus center, in pixels. x is horizontal.
     """
-    model = Trackastra.from_pretrained("general_2d")
+    # Force CPU: Trackastra defaults to MPS on Mac, which crashes the process
+    # with the same NSException that killed Cellpose uploads.
+    model = Trackastra.from_pretrained("general_2d", device="cpu")
     track_graph, _tracked_masks = model.track(video, masks, mode="greedy")
 
     # Each row is cell_id, frame, y, x. Trackastra stores y before x.

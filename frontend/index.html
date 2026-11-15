@@ -139,16 +139,11 @@
   <section class="card rise" aria-labelledby="proc-h">
     <h2 id="proc-h">Processing</h2>
     <div class="field" id="overall-progress">
-      <label id="prog-label" for="prog">Finding and following nuclei: not started</label>
+      <label id="prog-label" for="prog">Tracked cells: not started</label>
       <div class="bar" aria-hidden="true"><span id="bar-fill"></span></div>
       <progress id="prog" class="sr" max="200" value="0">0%</progress>
     </div>
-    <ol class="checks" id="process-checks">
-      <li id="check-received"><span class="dot" aria-hidden="true">1</span><span id="check-received-text">Videos received: <strong>Waiting</strong></span></li>
-      <li id="check-track"><span class="dot" aria-hidden="true">2</span><span id="check-track-text">Detecting and tracking nuclei: <strong>Waiting</strong></span></li>
-      <li id="check-ready"><span class="dot" aria-hidden="true">3</span><span id="check-ready-text">Ready for Point of Audio: <strong>Waiting</strong></span></li>
-    </ol>
-    <h3 id="batch-progress-h" tabindex="-1" hidden>Each video</h3>
+    <h3 id="batch-progress-h" class="sr" tabindex="-1" hidden>Videos</h3>
     <ol id="batch-list" class="checks batch-checks" hidden></ol>
     <div class="status-box">
       <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>

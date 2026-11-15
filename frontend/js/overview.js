@@ -109,12 +109,16 @@ function render() {
       "aria-label",
       (selected[video.job_id] ? "Selected. " : "Not selected. ") + video.name + ". Activate to toggle."
     );
+    const head = document.createElement("div");
+    head.className = "overview-head";
+    const heading = document.createElement("h3");
+    heading.textContent = video.name;
     const mark = document.createElement("span");
     mark.className = "overview-check";
     mark.setAttribute("aria-hidden", "true");
     mark.textContent = selected[video.job_id] ? "✓" : "";
-    const heading = document.createElement("h3");
-    heading.textContent = video.name;
+    head.appendChild(heading);
+    head.appendChild(mark);
     const image = document.createElement("img");
     image.src = video.imageUrl;
     image.alt = "";
@@ -122,8 +126,7 @@ function render() {
     image.height = 512;
     const summary = document.createElement("p");
     summary.textContent = video.behavior || "Behavior labels are not ready for this video yet.";
-    button.appendChild(mark);
-    button.appendChild(heading);
+    button.appendChild(head);
     button.appendChild(image);
     button.appendChild(summary);
     button.addEventListener("click", function () {
@@ -212,7 +215,9 @@ sortForm.addEventListener("submit", function (event) {
   }).then(function (result) {
     sortButton.disabled = false;
     const order = (result && result.job_ids) || [];
+    const hits = (result && result.matched_job_ids) || [];
     matchIds = {};
+    hits.forEach(function (id) { matchIds[id] = true; });
     if (order.length) {
       const byId = {};
       videos.forEach(function (video) { byId[video.job_id] = video; });
@@ -220,15 +225,16 @@ sortForm.addEventListener("submit", function (event) {
       order.forEach(function (id) {
         if (byId[id]) {
           next.push(byId[id]);
-          matchIds[id] = true;
           delete byId[id];
         }
       });
       Object.keys(byId).forEach(function (id) { next.push(byId[id]); });
       videos = next;
       render();
+    } else {
+      render();
     }
-    say((result && result.reason) || "Videos that match your search are outlined in green.");
+    say((result && result.reason) || "Videos that match your search are highlighted in light green.");
   }).catch(function (error) {
     sortButton.disabled = false;
     say(error.message || "Sorting could not finish. Videos stay in their current order.");

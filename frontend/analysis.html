@@ -71,8 +71,15 @@
     <h2 id="overview-h">Video overview</h2>
     <p class="hint">All chunks on the tracked frames. The overview video is silent — open one chunk below to listen.</p>
     <div class="split" style="align-items:flex-start">
-      <div style="flex:1 1 16em;min-width:12em;max-width:28rem">
-        <video id="overview-video" playsinline muted controls preload="auto" aria-label="Overview video showing all chunks, muted" style="width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)"></video>
+      <div class="overview-player" style="flex:1 1 16em;min-width:12em;max-width:28rem">
+        <video id="overview-video" playsinline muted preload="auto" aria-label="Overview video showing all chunks, muted"></video>
+        <div class="overview-controls">
+          <button type="button" class="btn btn-primary" id="overview-play" aria-controls="overview-video">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path id="overview-play-icon" d="M7 4v16l13-8z"></path></svg>
+            <span id="overview-play-label">Play overview</span>
+          </button>
+          <p class="overview-time" id="overview-time" aria-live="off">0:00 / 0:00</p>
+        </div>
       </div>
       <div class="copy" style="flex:2 1 18em;min-width:14em">
         <p id="desc-text">The overview will appear when the summary loads.</p>
