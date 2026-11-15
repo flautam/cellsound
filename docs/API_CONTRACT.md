@@ -60,7 +60,7 @@ The frontend counts "cells within 50 pixels" itself from `cells`.
 ```
 The server reads `poa`, `n_clusters` (default 5), and `position_weight` (default 0.5). `position_weight`: 0 = velocity only, 1 = position only.
 
-Each cluster keeps one fixed tone, from about 220 Hz for cluster 1 through 880 Hz for cluster 10. Pulse rate follows closeness to the Point of Audio (faster when cells are nearer). A small pitch bend can hint at direction. The body does not include `instruments`, `pitch_mode`, `volume_levels`, or `reverse_volume`.
+Each cluster keeps one fixed tone, from about 220 Hz for cluster 1 through 880 Hz for cluster 10. Pulse rate follows speed (faster motion taps faster). Pitch bend follows toward/away from the Point of Audio. The body does not include `instruments`, `pitch_mode`, `volume_levels`, or `reverse_volume`.
 
 Response: `{ "status": "done" }`.
 

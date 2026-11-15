@@ -117,7 +117,10 @@ def _source_preview(video_path: Path, fallback):
 def _track(job_id: str, video_path: Path) -> None:
     try:
         device = choose_device()
-        frame_limit, crop, note = limit_for_cpu(device.type, None, None)
+        # Always track 30 frames so video, tracks, and sound stay aligned.
+        frame_limit, crop, note = limit_for_cpu(device.type, 30, None)
+        if note is None:
+            note = "Tracking the first 30 frames."
         source_fps = _source_fps(video_path)
         _write_meta(
             job_id,

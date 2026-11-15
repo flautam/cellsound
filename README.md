@@ -30,7 +30,7 @@ cluster_timeseries.csv: per-frame cluster velocities
 summary.json:        overview (video summary from chunks) + ranked chunk descriptions
 clusters_overlay.mp4: chunk circles on tracked frames
 Sounds:              overview.wav, cluster_1.wav, ...
-Tones:               ten fixed pitches, about 220 Hz through 880 Hz. Faster pulses mean closer to the Point of Audio.
+Tones:               ten fixed pitches, about 220 Hz through 880 Hz. Faster pulses mean faster motion; pitch bend follows toward/away from the Point of Audio.
 
 Conventions: POA defaults to image center (`--poa X Y` to override).
 radial_v negative = toward POA. No angular velocity.

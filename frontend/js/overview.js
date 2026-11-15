@@ -1,8 +1,8 @@
 /* Overview: play the population sound, show traces, and read the summary. */
 const CARDS = [
   { id: "tone", title: "Each cluster has its own tone", text: "Cluster 1 is the lowest tone and higher cluster numbers sit higher, up to cluster 10. The note stays recognizable, so you can tell clusters apart immediately.", example: "Hear three tones", cue: "tone", status: "Example: three cluster tones in a row, each tapping slowly." },
-  { id: "pulse", title: "Faster pulses mean closer", text: "Pulse rate shows closeness to the Point of Audio. Cells near the point tap quickly. Cells far from it tap slowly. The base tone does not change to another cluster's note.", example: "Hear pulses speed up", cue: "pulse", status: "Example: one tone, tapping slowly at first, then faster as the cell comes closer." },
-  { id: "all", title: "Checked clusters together", text: "Overview plays each checked cluster on its own tone at the same time. A fast pulse is the cluster nearer the Point of Audio.", example: "Hear them together", cue: "all", status: "Example: two tones at once. The higher one pulses faster because it is closer.", wide: true, ink: true }
+  { id: "pulse", title: "Faster pulses mean faster motion", text: "Pulse rate follows speed. Fast clusters tap quickly. Slow clusters tap slowly. The base tone does not change to another cluster's note.", example: "Hear pulses speed up", cue: "pulse", status: "Example: one tone, tapping slowly at first, then faster as the cluster speeds up." },
+  { id: "all", title: "Checked clusters together", text: "Overview plays each checked cluster on its own tone at the same time. A fast pulse is the faster-moving cluster.", example: "Hear them together", cue: "all", status: "Example: two tones at once. The higher one pulses faster because that cluster is moving faster.", wide: true, ink: true }
 ];
 
 const playButton = document.getElementById("play");

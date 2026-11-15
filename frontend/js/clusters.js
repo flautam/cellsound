@@ -95,7 +95,7 @@ function showDetail() {
     path.colSpan = 2;
   }
   if (toneNote) {
-    toneNote.textContent = toneLabel(cluster) + " is this cluster's note. Faster pulses mean those cells are closer to the Point of Audio.";
+    toneNote.textContent = toneLabel(cluster) + " is this cluster's note. Faster pulses mean those cells are moving faster.";
   }
   document.getElementById("prev").disabled = current === 0;
   document.getElementById("next").disabled = current === clusters.length - 1;

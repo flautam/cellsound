@@ -30,8 +30,8 @@ TRACKS_PATH = ROOT / "output" / "tracks.csv"
 # dinov3 (`pip install git+https://github.com/facebookresearch/dinov3`).
 CELLPOSE_MODEL = "cpdino-vitb"
 
-# A CPU box with 8 GB of RAM cannot segment a whole movie.
-CPU_FRAMES = 10
+# Default tracking window: always 30 frames so overlays, sound, and video match.
+CPU_FRAMES = 30
 CPU_CROP = 256
 CPU_BATCH_SIZE = 1
 
