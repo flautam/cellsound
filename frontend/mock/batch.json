@@ -1,0 +1,22 @@
+{
+  "batch_id": "b1c2d3",
+  "status": "running",
+  "videos": [
+    {
+      "job_id": "a1b2c3",
+      "name": "left.mov",
+      "status": "done",
+      "frame": 30,
+      "total_frames": 30,
+      "message": "This video is ready"
+    },
+    {
+      "job_id": "d4e5f6",
+      "name": "circle.mov",
+      "status": "running",
+      "frame": 8,
+      "total_frames": 30,
+      "message": "Detecting and tracking nuclei"
+    }
+  ]
+}

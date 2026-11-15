@@ -15,9 +15,13 @@ const continueLink = document.getElementById("continue");
 const soundButton = document.getElementById("sound-check");
 const pauseButton = document.querySelector("[data-pause-mirror]");
 
-let chosenFile = null;
+let chosenFiles = [];
 let pollTimer = null;
+let batchTimer = null;
 let lastMilestone = -1;
+const batchList = document.getElementById("batch-list");
+const batchHeading = document.getElementById("batch-progress-h");
+const singleProgress = progress.closest(".field");
 
 function showFileError(message) {
   fileError.hidden = false;
@@ -39,23 +43,31 @@ function isVideo(file) {
   return name.endsWith(".mp4") || name.endsWith(".mov") || file.type === "video/mp4" || file.type === "video/quicktime";
 }
 
-function takeFile(file) {
-  chosenFile = null;
-  if (!file) {
-    fileName.textContent = "No file chosen";
-    showFileError("Choose an MP4 or MOV video first.");
+function takeFiles(fileList) {
+  chosenFiles = [];
+  const list = Array.prototype.slice.call(fileList || []);
+  if (!list.length) {
+    fileName.textContent = "No files chosen";
+    showFileError("Choose at least one MP4 or MOV video.");
     return;
   }
-  fileName.textContent = file.name;
-  if (!isVideo(file)) {
-    showFileError("That file is not an MP4 or MOV video.");
+  if (list.length > 8) {
+    fileName.textContent = list.length + " files chosen";
+    showFileError("Choose at most 8 videos at a time.");
     return;
   }
-  if (file.size > MAX_BYTES) {
-    showFileError("The video is larger than 100 MB.");
-    return;
+  for (let index = 0; index < list.length; index += 1) {
+    if (!isVideo(list[index])) {
+      showFileError(list[index].name + " is not an MP4 or MOV video.");
+      return;
+    }
+    if (list[index].size > MAX_BYTES) {
+      showFileError(list[index].name + " is larger than 100 MB.");
+      return;
+    }
   }
-  chosenFile = file;
+  chosenFiles = list;
+  fileName.textContent = list.map(function (file) { return file.name; }).join(", ");
   clearFileError();
 }
 
@@ -142,6 +154,7 @@ function poll(jobId) {
   getJob(jobId).then(function (data) {
     showProgress(data);
     if (data.status === "done" || data.status === "error") {
+      startButton.disabled = false;
       if (data.status === "error") {
         say(data.message || "Tracking stopped because of an error.");
       }
@@ -156,7 +169,7 @@ function poll(jobId) {
 }
 
 videoInput.addEventListener("change", function () {
-  takeFile(videoInput.files && videoInput.files[0]);
+  takeFiles(videoInput.files);
 });
 
 ["dragenter", "dragover"].forEach(function (name) {
@@ -172,28 +185,102 @@ videoInput.addEventListener("change", function () {
   });
 });
 drop.addEventListener("drop", function (event) {
-  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
-  takeFile(file);
+  takeFiles(event.dataTransfer && event.dataTransfer.files);
 });
 
+function showSingleProgress(on) {
+  if (singleProgress) singleProgress.hidden = !on;
+  document.querySelector(".checks").hidden = !on;
+  batchHeading.hidden = on;
+  batchList.hidden = on;
+}
+
+function drawBatch(data) {
+  batchList.replaceChildren();
+  (data.videos || []).forEach(function (video) {
+    const item = document.createElement("li");
+    const total = video.total_frames || 0;
+    const frame = video.frame || 0;
+    const where = video.status === "done"
+      ? "Ready"
+      : video.status === "error"
+        ? "Stopped"
+        : total
+          ? "Frame " + frame + " of " + total
+          : "Waiting";
+    item.textContent = video.name + ": " + where + ". " + (video.message || "");
+    batchList.appendChild(item);
+  });
+  const ready = (data.videos || []).filter(function (video) { return video.status === "done"; }).length;
+  const total = (data.videos || []).length;
+  if (data.status === "done") {
+    say(ready + " of " + total + " videos are ready.");
+    return;
+  }
+  if (data.status === "error") {
+    say("Every video stopped because of an error.");
+    return;
+  }
+  const current = (data.videos || []).find(function (video) { return video.status === "running"; });
+  say(current ? "Working on " + current.name + ". " + ready + " of " + total + " finished." : "Videos are queued.");
+}
+
+function pollBatch(batchId) {
+  getBatch(batchId).then(function (data) {
+    drawBatch(data);
+    if (data.status === "done" || data.status === "error") {
+      startButton.disabled = false;
+      batchHeading.focus();
+      return;
+    }
+    batchTimer = setTimeout(function () { pollBatch(batchId); }, 500);
+  }).catch(function (error) {
+    startButton.disabled = false;
+    say(error.message);
+  });
+}
+
+function appendCalibration(body, calibration) {
+  if (calibration.pixel_size_um !== null) body.append("pixel_size_um", String(calibration.pixel_size_um));
+  if (calibration.minutes_per_frame !== null) body.append("minutes_per_frame", String(calibration.minutes_per_frame));
+}
+
 startButton.addEventListener("click", function () {
-  if (!chosenFile) {
-    showFileError("Choose an MP4 or MOV video first.");
+  if (!chosenFiles.length) {
+    showFileError("Choose at least one MP4 or MOV video.");
     return;
   }
   const calibration = readCalibration();
   if (!calibration) return;
   saveCalibration(calibration);
-  const body = new FormData();
-  body.append("video", chosenFile);
-  if (calibration.pixel_size_um !== null) body.append("pixel_size_um", String(calibration.pixel_size_um));
-  if (calibration.minutes_per_frame !== null) body.append("minutes_per_frame", String(calibration.minutes_per_frame));
   startButton.disabled = true;
-  lastMilestone = -1;
-  say("Tracking started. We will announce each quarter.");
-  createJob(body).then(function (data) {
-    setJobId(data.job_id);
-    poll(data.job_id);
+  continueLink.hidden = true;
+  if (chosenFiles.length === 1) {
+    showSingleProgress(true);
+    const body = new FormData();
+    body.append("video", chosenFiles[0]);
+    appendCalibration(body, calibration);
+    lastMilestone = -1;
+    say("Tracking started. We will announce each quarter.");
+    createJob(body).then(function (data) {
+      setJobId(data.job_id);
+      poll(data.job_id);
+    }).catch(function (error) {
+      startButton.disabled = false;
+      showFileError(error.message);
+    });
+    return;
+  }
+  showSingleProgress(false);
+  const body = new FormData();
+  chosenFiles.forEach(function (file) { body.append("videos", file); });
+  appendCalibration(body, calibration);
+  say("Upload started. Videos will run one at a time.");
+  batchHeading.focus();
+  createBatch(body).then(function (data) {
+    try { sessionStorage.setItem("cellsound-batch", data.batch_id); } catch (error) { /* later pages can still use the address */ }
+    drawBatch(data);
+    pollBatch(data.batch_id);
   }).catch(function (error) {
     startButton.disabled = false;
     showFileError(error.message);
@@ -214,4 +301,5 @@ if (pauseButton) {
 
 window.addEventListener("pagehide", function () {
   clearTimeout(pollTimer);
+  clearTimeout(batchTimer);
 });

@@ -95,6 +95,16 @@ function audioUrl(jobId, name) {
   return "/api/jobs/" + encodeURIComponent(jobId) + "/audio/" + encodeURIComponent(file) + ".wav";
 }
 
+function createBatch(formData) {
+  if (USE_MOCK) return mockFile("batch");
+  return fetch("/api/batches", { method: "POST", body: formData }).then(readBody);
+}
+
+function getBatch(batchId) {
+  if (USE_MOCK) return mockFile("batch");
+  return fetch("/api/batches/" + encodeURIComponent(batchId)).then(readBody);
+}
+
 function analyzeJob(jobId, body) {
   if (USE_MOCK) {
     mockRun.mode = "analyze";

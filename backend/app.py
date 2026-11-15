@@ -26,6 +26,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from backend.motion_types import write_motion_types
 from backend.pipeline import run_job_analysis
 from backend.track import choose_device, limit_for_cpu, link_tracks, segment_nuclei, select_frames
 from backend.video import load_video
@@ -33,8 +34,11 @@ from backend.video import load_video
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 JOBS = ROOT / "output" / "jobs"
+BATCHES = ROOT / "output" / "batches"
 MAX_BYTES = 100 * 1024 * 1024
+MAX_BATCH = 8
 _lock = threading.Lock()
+_gpu = threading.Lock()
 
 app = FastAPI(title="cellsound")
 
@@ -542,6 +546,157 @@ def export_zip(job_id: str, include: str = "audio,text,data,settings"):
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=cellsound-results.zip"},
     )
+
+
+def _batch_path(batch_id: str) -> Path:
+    return BATCHES / batch_id / "batch.json"
+
+
+def _read_batch(batch_id: str) -> dict | None:
+    path = _batch_path(batch_id)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+def _write_batch(batch_id: str, payload: dict) -> None:
+    path = _batch_path(batch_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _video_suffix(name: str, content_type: str | None) -> str | None:
+    lowered = (name or "").lower()
+    if lowered.endswith(".mov") or content_type == "video/quicktime":
+        return ".mov"
+    if lowered.endswith(".mp4") or content_type in {"video/mp4", "application/mp4"}:
+        return ".mp4"
+    return None
+
+
+def _batch_view(payload: dict) -> dict:
+    videos = []
+    for item in payload.get("videos", []):
+        meta = _read_meta(item["job_id"])
+        videos.append(
+            {
+                "job_id": item["job_id"],
+                "name": item.get("name") or "video",
+                "status": item.get("status") or "queued",
+                "frame": int(meta.get("frame") or 0),
+                "total_frames": int(meta.get("total_frames") or 0),
+                "message": item.get("message") or meta.get("message") or "",
+            }
+        )
+    states = [video["status"] for video in videos]
+    if any(state in {"queued", "running"} for state in states):
+        status = "running" if any(state == "running" for state in states) or any(state == "done" for state in states) else "queued"
+    elif states and all(state == "error" for state in states):
+        status = "error"
+    else:
+        status = "done"
+    return {"batch_id": payload.get("batch_id"), "status": status, "videos": videos}
+
+
+def _finish_one_video(job_id: str) -> None:
+    """Track one video, then cluster it around the image center. One at a time."""
+    folder = _job_dir(job_id)
+    video_path = _video_file(folder)
+    if video_path is None:
+        raise FileNotFoundError("The uploaded video could not be found.")
+    with _gpu:
+        _track(job_id, video_path)
+        meta = _read_meta(job_id)
+        if meta.get("status") == "error":
+            raise RuntimeError(meta.get("message") or "Tracking stopped because of an error.")
+        width = int(meta.get("width") or 1)
+        height = int(meta.get("height") or 1)
+        body = {"poa": {"x": width / 2, "y": height / 2}}
+        tracks = pd.read_csv(folder / "tracks.csv")
+        _write_meta(job_id, status="running", stage="measuring", message="Clustering this video")
+        run_job_analysis(
+            folder,
+            tracks,
+            body,
+            width,
+            height,
+            meta.get("pixel_size_um"),
+            meta.get("minutes_per_frame"),
+            fps=meta.get("fps"),
+        )
+        (folder / "settings.json").write_text(json.dumps(body))
+        write_motion_types(folder)
+        _write_meta(job_id, status="done", stage="done", message="This video is ready")
+
+
+def _run_batch(batch_id: str) -> None:
+    payload = _read_batch(batch_id)
+    if payload is None:
+        return
+    for item in payload.get("videos", []):
+        item["status"] = "running"
+        item["message"] = "Waiting for this video's turn"
+        _write_batch(batch_id, payload)
+        try:
+            _finish_one_video(item["job_id"])
+            item["status"] = "done"
+            item["message"] = "This video is ready"
+        except Exception as exc:
+            traceback.print_exc()
+            item["status"] = "error"
+            item["message"] = str(exc) or "This video could not be processed."
+        _write_batch(batch_id, payload)
+
+
+@app.post("/api/batches")
+async def create_batch(
+    videos: list[UploadFile] = File(...),
+    pixel_size_um: float | None = Form(None),
+    minutes_per_frame: float | None = Form(None),
+):
+    if not videos:
+        return JSONResponse(status_code=400, content={"error": "no_video", "message": "Choose at least one MP4 or MOV video."})
+    if len(videos) > MAX_BATCH:
+        return JSONResponse(status_code=400, content={"error": "too_many", "message": f"Choose at most {MAX_BATCH} videos at a time."})
+    batch_id = uuid4().hex[:6]
+    saved = []
+    for video in videos:
+        suffix = _video_suffix(video.filename or "", video.content_type)
+        if suffix is None:
+            return JSONResponse(status_code=400, content={"error": "not_mp4", "message": "Each file must be an MP4 or MOV video."})
+        payload = await video.read()
+        if len(payload) > MAX_BYTES:
+            return JSONResponse(status_code=413, content={"error": "too_large", "message": "Each video must be 100 MB or smaller."})
+        job_id = uuid4().hex[:6]
+        folder = _job_dir(job_id)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"video{suffix}").write_bytes(payload)
+        _write_meta(
+            job_id,
+            status="queued",
+            stage="received",
+            frame=0,
+            total_frames=0,
+            message="Waiting for this video's turn",
+            pixel_size_um=pixel_size_um,
+            minutes_per_frame=minutes_per_frame,
+            width=0,
+            height=0,
+            batch_id=batch_id,
+        )
+        saved.append({"job_id": job_id, "name": video.filename or f"video{suffix}", "status": "queued", "message": "Waiting for this video's turn"})
+    record = {"batch_id": batch_id, "videos": saved}
+    _write_batch(batch_id, record)
+    threading.Thread(target=_run_batch, args=(batch_id,), daemon=True).start()
+    return _batch_view(record)
+
+
+@app.get("/api/batches/{batch_id}")
+def batch_status(batch_id: str):
+    payload = _read_batch(batch_id)
+    if payload is None:
+        return JSONResponse(status_code=404, content={"error": "missing_batch", "message": "That group of videos was not found."})
+    return _batch_view(payload)
 
 
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")

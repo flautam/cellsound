@@ -1,0 +1,47 @@
+{
+  "job_id": "a1b2c3",
+  "reference": { "kind": "center", "x": 92, "y": 92 },
+  "thresholds": {
+    "still_speed": 0.75,
+    "direction_speed": 2.0,
+    "radial_speed": 1.0,
+    "angular_speed": 0.05
+  },
+  "clusters": [
+    {
+      "cluster_id": 1,
+      "n_cells": 40,
+      "main_type": "inward",
+      "search_types": ["inward", "up"],
+      "description": "These cells mostly move in toward the center.",
+      "scores": {
+        "still": 0.0,
+        "left": 0.1,
+        "right": 0.2,
+        "up": 0.0,
+        "down": 0.15,
+        "inward": 0.8,
+        "outward": 0.0,
+        "circling clockwise": 0.1,
+        "circling counterclockwise": 0.0
+      }
+    },
+    {
+      "cluster_id": 2,
+      "n_cells": 12,
+      "main_type": "still",
+      "description": "These cells mostly stay still.",
+      "scores": {
+        "still": 0.9,
+        "left": 0.02,
+        "right": 0.0,
+        "up": 0.01,
+        "down": 0.0,
+        "inward": 0.0,
+        "outward": 0.0,
+        "circling clockwise": 0.0,
+        "circling counterclockwise": 0.0
+      }
+    }
+  ]
+}

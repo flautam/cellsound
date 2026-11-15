@@ -67,11 +67,7 @@
       <div class="hero-copy">
         <div>
           <h1>Hear how your cells move</h1>
-          <p class="lede">Upload a microscopy video. We find every nucleus, follow it, and turn its movement into sound and plain-language descriptions. Everything works with a keyboard and screen reader.</p>
-          <div class="flow">
-            <a class="btn btn-primary lift" href="#choose-h"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Start step 1: upload your video<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg></a>
-            <a class="btn btn-line lift" href="#help">Check your sound first</a>
-          </div>
+          <p class="lede">Upload one microscopy video, or several to compare. We find every nucleus, follow it, and turn its movement into sound and plain-language descriptions. Everything works with a keyboard and screen reader.</p>
         </div>
         <svg class="art float" aria-hidden="true" viewBox="0 0 300 200">
           <circle cx="150" cy="100" r="86" fill="none" stroke="var(--primary)" stroke-width="6" opacity="0.3"></circle>
@@ -113,14 +109,14 @@
     </div>
   </section>
   <section class="card rise" aria-labelledby="choose-h">
-    <h2 id="choose-h" tabindex="-1">Step 1: Choose your video</h2>
+    <h2 id="choose-h" tabindex="-1">Step 1: Choose your videos</h2>
     <div class="drop" id="drop">
       <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>
-      <label id="video-label" class="drop-title" for="video">Video file (MP4 or MOV)</label>
-      <input id="video" class="sr file-in" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" aria-labelledby="video-label" aria-describedby="video-hint">
-      <label for="video" class="file-btn" aria-hidden="true">Choose file</label>
-      <p id="file-name" class="file-name" aria-hidden="true">No file chosen</p>
-      <p id="video-hint" class="hint">MP4 or MOV, up to 100MB. You can also drag a file onto this box.</p>
+      <label id="video-label" class="drop-title" for="video">Video files (MP4 or MOV)</label>
+      <input id="video" class="sr file-in" type="file" multiple accept="video/mp4,video/quicktime,.mp4,.mov" aria-labelledby="video-label" aria-describedby="video-hint">
+      <label for="video" class="file-btn" aria-hidden="true">Choose files</label>
+      <p id="file-name" class="file-name">No files chosen</p>
+      <p id="video-hint" class="hint">One video, or up to 8. MP4 or MOV, 100 MB each. You can also drag files onto this box.</p>
       <p id="video-error" class="error" hidden></p>
     </div>
     <fieldset class="fields">
@@ -153,9 +149,11 @@
       <li id="check-received"><span class="dot" aria-hidden="true">1</span><span>Video received, <span id="received-count">0</span> frames: <strong>Waiting</strong></span></li>
       <li id="check-track"><span class="dot" aria-hidden="true">2</span><span>Detecting and tracking nuclei: <strong>Waiting</strong></span></li>
     </ol>
+    <h3 id="batch-progress-h" tabindex="-1" hidden>Each video</h3>
+    <ul id="batch-list" class="checks" hidden></ul>
     <div class="status-box">
       <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
-      <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Press Start processing after you choose an MP4 or MOV. We will announce each quarter.</p>
+      <p id="status-text" role="status" aria-live="polite" aria-atomic="true">Press Start processing after you choose one or more MP4 or MOV files.</p>
     </div>
     <div><a class="btn btn-primary" id="continue" href="setup.html" hidden>Continue to Point of Audio</a></div>
   </section>

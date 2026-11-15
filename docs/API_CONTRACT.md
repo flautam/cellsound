@@ -115,3 +115,28 @@ Names: `overview`, `cluster_1` … `cluster_N`, `cell_{id}`, and examples `examp
 
 ## 8. Download: `GET /api/jobs/{job_id}/export.zip?include=audio,text,data,settings`
 Returns `cellsound-results.zip`. `settings.json` inside holds the exact body sent to `/analyze`, so a collaborator can rerun it.
+
+## 9. Upload several videos: `POST /api/batches`
+`multipart/form-data`: `videos` (one or more MP4 or MOV files, each max 100 MB, at most 8), `pixel_size_um` (optional), `minutes_per_frame` (optional).
+
+Videos are tracked and clustered one at a time, using the image center as the Point of Audio. The single-video `POST /api/jobs` endpoint is unchanged.
+
+```json
+{
+  "batch_id": "b1c2d3",
+  "status": "queued",
+  "videos": [
+    { "job_id": "a1b2c3", "name": "left.mov", "status": "queued", "frame": 0, "total_frames": 0, "message": "Waiting for this video's turn" }
+  ]
+}
+```
+
+Errors use the same top-level `{ "error", "message" }` shape: `no_video`, `too_many`, `not_mp4`, `too_large`.
+
+## 10. Batch progress: `GET /api/batches/{batch_id}`
+Same JSON as the upload response. `status` is `queued`, `running`, `done`, or `error`. Each video has its own `status`, `frame`, and `total_frames`. An example is `frontend/mock/batch.json`.
+
+## Motion types file (not an endpoint yet)
+Written beside one finished job as `output/jobs/{job_id}/motion_types.json`. Existing job endpoints are unchanged. An example is `frontend/mock/motion_types.json`.
+
+Each cluster has one main label, a `search_types` list, and a 0–1 score for every type. A search for any label in `search_types` can find that cluster. A second label is added when its score is within `close_gap` of the winner and at least `close_floor`. Types: `still`, `left`, `right`, `up`, `down`, `inward`, `outward`, `circling clockwise`, `circling counterclockwise`. Up is toward the top of the image. Clockwise is clockwise on the image. Inward means toward the Point of Audio when one was saved, otherwise the image center. Scores use pixels per frame. The thresholds live in `backend/motion_types.py`.
