@@ -11,9 +11,9 @@
     {
       "cluster_id": 1,
       "n_cells": 40,
-      "main_type": "inward",
-      "search_types": ["inward", "up"],
-      "description": "These cells mostly move in toward the center.",
+      "main_type": "right",
+      "search_types": ["right"],
+      "description": "These cells mostly move right.",
       "scores": {
         "still": 0.0,
         "left": 0.1,
@@ -29,8 +29,9 @@
     {
       "cluster_id": 2,
       "n_cells": 12,
-      "main_type": "still",
-      "description": "These cells mostly stay still.",
+      "main_type": "left",
+      "search_types": ["left"],
+      "description": "These cells mostly move left.",
       "scores": {
         "still": 0.9,
         "left": 0.02,

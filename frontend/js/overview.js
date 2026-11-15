@@ -8,7 +8,6 @@ const sortButton = document.getElementById("sort-videos");
 const questionInput = document.getElementById("question");
 
 let videos = [];
-let sorterConfigured = false;
 
 function say(text) {
   if (statusText.textContent !== text) statusText.textContent = text;
@@ -22,6 +21,30 @@ function batchId() {
   }
 }
 
+var DIRECTIONS = ["left", "right", "up", "down"];
+var DIRECTION_LINES = {
+  left: "These cells mostly move left.",
+  right: "These cells mostly move right.",
+  up: "These cells mostly move up, toward the top of the image.",
+  down: "These cells mostly move down, toward the bottom of the image."
+};
+
+function groupDirection(cluster) {
+  if (cluster && DIRECTIONS.indexOf(cluster.main_type) >= 0) return cluster.main_type;
+  var scores = (cluster && cluster.scores) || {};
+  var best = DIRECTIONS[0];
+  var bestScore = -1;
+  DIRECTIONS.forEach(function (name) {
+    var score = Number(scores[name]);
+    if (!isFinite(score)) score = 0;
+    if (score > bestScore) {
+      best = name;
+      bestScore = score;
+    }
+  });
+  return best;
+}
+
 function behaviorText(motion) {
   const clusters = (motion && motion.clusters) || [];
   if (!clusters.length) return "";
@@ -29,13 +52,14 @@ function behaviorText(motion) {
     return (b.n_cells || 0) - (a.n_cells || 0);
   });
   const main = ranked[0];
+  const label = groupDirection(main);
   const second = (main.search_types || []).filter(function (name) {
-    return name && name !== main.main_type;
+    return DIRECTIONS.indexOf(name) >= 0 && name !== label;
   })[0];
-  let text = "Main behavior: " + main.main_type + ".";
+  let text = "Main behavior: " + label + ".";
   if (second) text += " Close second: " + second + ".";
   if (ranked.length > 1) text += " " + ranked.length + " groups were traced.";
-  if (main.description) text += " " + main.description;
+  text += " " + DIRECTION_LINES[label];
   return text;
 }
 
@@ -100,14 +124,8 @@ function attachLabels(catalog) {
   }));
 }
 
-function applySorter(status) {
-  sorterConfigured = Boolean(status && status.configured);
-  sortButton.disabled = !sorterConfigured;
-  if (!sorterConfigured) {
-    say(status && status.message
-      ? status.message
-      : "Sorting is unavailable. Videos stay in their current order, with their behavior labels.");
-  }
+function applySorter() {
+  sortButton.disabled = false;
 }
 
 sortForm.addEventListener("submit", function (event) {
@@ -118,10 +136,6 @@ sortForm.addEventListener("submit", function (event) {
     questionInput.focus();
     return;
   }
-  if (!sorterConfigured) {
-    say("Sorting is unavailable because the server has no API key. Videos stay in their current order.");
-    return;
-  }
   sortButton.disabled = true;
   say("Sorting the videos.");
   sortVideos({
@@ -130,31 +144,25 @@ sortForm.addEventListener("submit", function (event) {
       return { job_id: video.job_id, name: video.name };
     })
   }).then(function (result) {
-    sortButton.disabled = !sorterConfigured;
-    if (!result || result.configured === false) {
-      sorterConfigured = false;
-      sortButton.disabled = true;
-      say(result && result.reason
-        ? result.reason
-        : "Sorting is unavailable. Videos stay in their current order.");
-      return;
+    sortButton.disabled = false;
+    const order = (result && result.job_ids) || [];
+    if (order.length) {
+      const byId = {};
+      videos.forEach(function (video) { byId[video.job_id] = video; });
+      const next = [];
+      order.forEach(function (id) {
+        if (byId[id]) {
+          next.push(byId[id]);
+          delete byId[id];
+        }
+      });
+      Object.keys(byId).forEach(function (id) { next.push(byId[id]); });
+      videos = next;
+      render();
     }
-    const order = result.job_ids || [];
-    const byId = {};
-    videos.forEach(function (video) { byId[video.job_id] = video; });
-    const next = [];
-    order.forEach(function (id) {
-      if (byId[id]) {
-        next.push(byId[id]);
-        delete byId[id];
-      }
-    });
-    Object.keys(byId).forEach(function (id) { next.push(byId[id]); });
-    videos = next;
-    render();
-    say(result.reason || "Videos are ordered to match your question.");
+    say((result && result.reason) || "Videos are ordered to match your question.");
   }).catch(function (error) {
-    sortButton.disabled = !sorterConfigured;
+    sortButton.disabled = false;
     say(error.message || "Sorting could not finish. Videos stay in their current order.");
   });
 });
@@ -185,12 +193,7 @@ loadCatalog().then(function (catalog) {
     sortSection.hidden = false;
     render();
     say(traced.length + (traced.length === 1 ? " video has a behavior summary." : " videos have behavior summaries."));
-    return getSorter().then(applySorter).catch(function () {
-      applySorter({
-        configured: false,
-        message: "Sorting is unavailable. Videos stay in their current order, with their behavior labels."
-      });
-    });
+    return getSorter().then(applySorter).catch(applySorter);
   });
 }).catch(function (error) {
   showEmpty(error.message || "Finish cell tracing first.");

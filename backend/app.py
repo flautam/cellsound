@@ -11,11 +11,9 @@ Open http://127.0.0.1:8000/
 from __future__ import annotations
 
 import json
-import os
+import re
 import threading
 import traceback
-import urllib.error
-import urllib.request
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -30,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from backend.motion_types import write_motion_types
+from backend.motion_types import apply_direction_groups, write_motion_types
 from backend.pipeline import overlay_playback_fps, run_job_analysis
 from backend.track import choose_device, limit_for_cpu, link_tracks, segment_nuclei, select_frames
 from backend.video import load_video
@@ -43,6 +41,29 @@ MAX_BYTES = 100 * 1024 * 1024
 MAX_BATCH = 8
 _lock = threading.Lock()
 _gpu = threading.Lock()
+_DIRECTIONS = ("up", "down", "left", "right")
+_DIRECTION_PHRASES = (
+    ("toward the top", "up"),
+    ("towards the top", "up"),
+    ("to the top", "up"),
+    ("upward", "up"),
+    ("upwards", "up"),
+    ("toward the bottom", "down"),
+    ("towards the bottom", "down"),
+    ("to the bottom", "down"),
+    ("downward", "down"),
+    ("downwards", "down"),
+    ("toward the left", "left"),
+    ("towards the left", "left"),
+    ("to the left", "left"),
+    ("leftward", "left"),
+    ("leftwards", "left"),
+    ("toward the right", "right"),
+    ("towards the right", "right"),
+    ("to the right", "right"),
+    ("rightward", "right"),
+    ("rightwards", "right"),
+)
 
 app = FastAPI(title="cellsound")
 # Pages on cellsound.select call this server on another host. Same-origin
@@ -725,10 +746,8 @@ def _safe_job_id(job_id: str) -> bool:
     return all(char.isalnum() or char in "-_" for char in job_id)
 
 
-def _sorter_message(configured: bool) -> str:
-    if configured:
-        return "Ask a question to sort these videos by behavior. For example: show videos where cells move up."
-    return "Sorting is unavailable because the server has no API key. Videos stay in their current order, with their behavior labels."
+_SORT_READY = "Ask a question to sort these videos by behavior. For example: show videos where cells move up."
+_SORT_NEEDS_DIRECTION = "The question needs a direction: up, down, left, or right."
 
 
 @app.get("/api/jobs/{job_id}/motion-types")
@@ -750,13 +769,13 @@ def motion_types(job_id: str):
             status_code=404,
             content={"error": "not_ready", "message": "Finish cell tracing before behavior labels are available."},
         )
-    return json.loads(path.read_text())
+    payload = json.loads(path.read_text())
+    return apply_direction_groups(payload)
 
 
 @app.get("/api/sort")
 def sort_status():
-    configured = bool(os.environ.get("XAI_API_KEY", "").strip())
-    return {"configured": configured, "message": _sorter_message(configured)}
+    return {"configured": True, "message": _SORT_READY}
 
 
 def _labels_for_sort(job_id: str, name: str) -> dict:
@@ -764,7 +783,7 @@ def _labels_for_sort(job_id: str, name: str) -> dict:
     behaviors = []
     if path.exists():
         try:
-            data = json.loads(path.read_text())
+            data = apply_direction_groups(json.loads(path.read_text()))
         except Exception:
             data = {}
         for cluster in data.get("clusters") or []:
@@ -779,59 +798,140 @@ def _labels_for_sort(job_id: str, name: str) -> dict:
     return {"job_id": job_id, "name": name, "behaviors": behaviors}
 
 
-def _parse_json_object(text: str) -> dict:
-    cleaned = (text or "").strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[-1]
-        fence = cleaned.rfind("```")
-        if fence >= 0:
-            cleaned = cleaned[:fence]
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start < 0 or end < start:
-        raise ValueError("The sorter did not return a list.")
-    parsed = json.loads(cleaned[start : end + 1])
-    if not isinstance(parsed, dict):
-        raise ValueError("The sorter did not return a list.")
-    return parsed
+def _directions_in_text(text: str) -> list[str]:
+    """Directions named in text, in the order they appear."""
+    lowered = (text or "").lower()
+    hits: list[tuple[int, str]] = []
+    occupied: list[tuple[int, int]] = []
+
+    def overlaps(start: int, end: int) -> bool:
+        return any(start < stop and end > begin for begin, stop in occupied)
+
+    for phrase, direction in _DIRECTION_PHRASES:
+        start = 0
+        while True:
+            index = lowered.find(phrase, start)
+            if index < 0:
+                break
+            end = index + len(phrase)
+            if not overlaps(index, end):
+                hits.append((index, direction))
+                occupied.append((index, end))
+            start = index + 1
+    for direction in _DIRECTIONS:
+        for match in re.finditer(rf"\b{direction}\b", lowered):
+            if not overlaps(match.start(), match.end()):
+                hits.append((match.start(), direction))
+                occupied.append((match.start(), match.end()))
+    hits.sort(key=lambda item: item[0])
+    found: list[str] = []
+    seen: set[str] = set()
+    for _, direction in hits:
+        if direction not in seen:
+            seen.add(direction)
+            found.append(direction)
+    return found
 
 
-def _ask_grok(key: str, question: str, videos: list) -> tuple[list, str]:
-    model = os.environ.get("XAI_MODEL", "grok-4-fast").strip() or "grok-4-fast"
-    payload = {
-        "model": model,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You sort cell-microscopy videos using only the behavior labels in the user message. "
-                    "You do not receive video files. Reply with one JSON object and nothing else, shaped as "
-                    '{"job_ids": ["id", "..."], "reason": "one sentence"}. '
-                    "Use each given job id exactly once. Put videos that match the question first."
-                ),
-            },
-            {"role": "user", "content": json.dumps({"question": question, "videos": videos})},
-        ],
-    }
-    request = urllib.request.Request(
-        "https://api.x.ai/v1/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            raw = json.loads(response.read().decode())
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError("sorter request failed") from exc
-    text = raw["choices"][0]["message"]["content"]
-    parsed = _parse_json_object(text)
-    ids = parsed.get("job_ids")
-    if not isinstance(ids, list):
-        raise RuntimeError("sorter JSON missing job_ids")
-    reason = parsed.get("reason") if isinstance(parsed.get("reason"), str) else ""
-    return [str(item) for item in ids], reason
+def _direction_name(value) -> str:
+    name = str(value or "").strip().lower()
+    return name if name in _DIRECTIONS else ""
+
+
+def _labels_from_request(item: dict) -> list | None:
+    """Labels sent with one video. None means read the labels stored for that job."""
+    behaviors = item.get("behaviors")
+    if isinstance(behaviors, list):
+        return [entry for entry in behaviors if isinstance(entry, dict)]
+    label_keys = ("behavior", "main_type", "search_types", "description", "labels")
+    if not any(key in item for key in label_keys):
+        return None
+    search = item.get("search_types")
+    labels = item.get("labels")
+    if not isinstance(search, list):
+        search = labels if isinstance(labels, list) else []
+    description = item.get("description") or item.get("behavior") or ""
+    if isinstance(labels, str) and not description:
+        description = labels
+    return [
+        {
+            "main_type": item.get("main_type") or "",
+            "search_types": search,
+            "n_cells": item.get("n_cells") or 0,
+            "description": description,
+        }
+    ]
+
+
+def _cluster_directions(cluster: dict) -> tuple[str, set[str]]:
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def add(name: str) -> None:
+        if name and name not in seen:
+            seen.add(name)
+            found.append(name)
+
+    main = _direction_name(cluster.get("main_type"))
+    add(main)
+    search = cluster.get("search_types") or []
+    if isinstance(search, list):
+        for name in search:
+            add(_direction_name(name))
+    for name in _directions_in_text(str(cluster.get("description") or "")):
+        add(name)
+    for name in _directions_in_text(str(cluster.get("behavior") or "")):
+        add(name)
+    if not main and found:
+        main = found[0]
+    return main, set(found)
+
+
+def _video_profile(behaviors: list) -> tuple[str, set[str]]:
+    ranked = []
+    for cluster in behaviors:
+        if not isinstance(cluster, dict):
+            continue
+        try:
+            weight = int(cluster.get("n_cells") or 0)
+        except (TypeError, ValueError):
+            weight = 0
+        main, found = _cluster_directions(cluster)
+        ranked.append((weight, main, found))
+    if not ranked:
+        return "", set()
+    ranked.sort(key=lambda row: row[0], reverse=True)
+    main = next((row[1] for row in ranked if row[1]), "")
+    found: set[str] = set()
+    for _, _, names in ranked:
+        found.update(names)
+    return main, found
+
+
+def _match_rank(main: str, found: set[str], asked: list[str]) -> tuple[int, int, int] | None:
+    overlap = [name for name in asked if name in found]
+    if not overlap:
+        return None
+    main_hit = 1 if main in overlap else 0
+    earliest = min(asked.index(name) for name in overlap)
+    return (len(overlap), main_hit, -earliest)
+
+
+def _direction_phrase(names: list[str]) -> str:
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} or {names[1]}"
+    return ", ".join(names[:-1]) + ", or " + names[-1]
+
+
+def _sort_reason(asked: list[str], matched: list[set[str]]) -> str:
+    if not asked:
+        return _SORT_NEEDS_DIRECTION
+    present = [name for name in asked if any(name in found for found in matched)]
+    if not present:
+        return f"None of these videos move {_direction_phrase(asked)}. They stay in their current order."
+    return f"These videos mostly move {_direction_phrase(present)}."
 
 
 @app.post("/api/sort")
@@ -844,43 +944,33 @@ def sort_videos(body: dict):
     if not isinstance(raw, list) or not raw:
         return JSONResponse(status_code=400, content={"error": "no_videos", "message": "There are no videos to sort."})
     videos = []
-    order = []
     for item in raw[:MAX_BATCH]:
         if not isinstance(item, dict):
             continue
         job_id = str(item.get("job_id") or "")
         if not _safe_job_id(job_id):
             continue
-        name = str(item.get("name") or job_id)[:200]
-        videos.append(_labels_for_sort(job_id, name))
-        order.append(job_id)
+        supplied = _labels_from_request(item)
+        if supplied is None:
+            supplied = _labels_for_sort(job_id, str(item.get("name") or job_id)[:200])["behaviors"]
+        videos.append({"job_id": job_id, "behaviors": supplied})
     if not videos:
         return JSONResponse(status_code=400, content={"error": "no_videos", "message": "There are no videos to sort."})
-    key = os.environ.get("XAI_API_KEY", "").strip()
-    if not key:
-        return {
-            "configured": False,
-            "job_ids": order,
-            "reason": _sorter_message(False),
-        }
-    try:
-        ordered, reason = _ask_grok(key, question, videos)
-    except Exception:
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=502,
-            content={"error": "sort_failed", "message": "Sorting could not finish. Videos stay in their current order."},
-        )
-    cleaned = [job_id for job_id in ordered if job_id in order]
-    for job_id in order:
-        if job_id not in cleaned:
-            cleaned.append(job_id)
-    sentence = " ".join(reason.split())
-    if len(sentence) > 280:
-        sentence = sentence[:277].rstrip() + "..."
-    if not sentence:
-        sentence = "Videos are ordered to match your question."
-    return {"configured": True, "job_ids": cleaned, "reason": sentence}
+    asked = _directions_in_text(question)
+    order = [video["job_id"] for video in videos]
+    if not asked:
+        return {"configured": True, "job_ids": order, "reason": _SORT_NEEDS_DIRECTION}
+    ranked = []
+    for index, video in enumerate(videos):
+        main, found = _video_profile(video["behaviors"])
+        ranked.append((_match_rank(main, found, asked), index, video["job_id"], found))
+    matched = [row for row in ranked if row[0] is not None]
+    missed = [row for row in ranked if row[0] is None]
+    matched.sort(key=lambda row: (-row[0][0], -row[0][1], -row[0][2], row[1]))
+    missed.sort(key=lambda row: row[1])
+    ordered = [row[2] for row in matched + missed]
+    reason = _sort_reason(asked, [row[3] for row in matched])
+    return {"configured": True, "job_ids": ordered, "reason": reason}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="frontend")

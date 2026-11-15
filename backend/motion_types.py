@@ -1,12 +1,16 @@
-"""Label each cluster with a movement type.
+"""Label each cluster with a movement direction.
 
 Reads an existing job folder. Does not change the tracking or analysis endpoints.
 Writes output/jobs/<id>/motion_types.json.
 
 Image coordinates: x grows to the right, y grows downward.
-Up is toward the top of the image. Clockwise is clockwise on the image.
-Inward, outward, and circling use the Point of Audio when one was saved,
-otherwise the center of the image.
+Up is negative vy, toward the top of the image. Down is positive vy.
+Left is negative vx. Right is positive vx.
+
+The group name is only up, down, left, or right. Still, inward, outward,
+and circling can stay in the score list, but they are not the group name
+or a search label. If one of those would have won, the strongest of the
+four directions is used instead.
 """
 
 from __future__ import annotations
@@ -35,28 +39,20 @@ THRESHOLDS = {
     "close_floor": 0.4,
 }
 
-TYPES = (
-    "still",
-    "inward",
-    "outward",
+# Group and search labels, in tie-break order. An equal score keeps the
+# earlier name. Still, inward, outward, and circling are scored only.
+DIRECTIONS = (
     "left",
     "right",
     "up",
     "down",
-    "circling clockwise",
-    "circling counterclockwise",
 )
 
 SENTENCES = {
-    "still": "These cells mostly stay still.",
-    "inward": "These cells mostly move in toward the {place}.",
-    "outward": "These cells mostly move out away from the {place}.",
     "left": "These cells mostly move left.",
     "right": "These cells mostly move right.",
     "up": "These cells mostly move up, toward the top of the image.",
     "down": "These cells mostly move down, toward the bottom of the image.",
-    "circling clockwise": "These cells mostly circle the {place} clockwise.",
-    "circling counterclockwise": "These cells mostly circle the {place} counterclockwise.",
 }
 
 
@@ -85,21 +81,33 @@ def _scores(vx: float, vy: float, speed: float, radial: float, angular: float) -
 
 
 def _main_type(scores: dict) -> str:
-    best = max(TYPES, key=lambda name: (scores.get(name, 0.0), -TYPES.index(name)))
+    """Strongest image direction. Inward, outward, still, and circling cannot win."""
+    best = max(DIRECTIONS, key=lambda name: (float(scores.get(name, 0.0) or 0.0), -DIRECTIONS.index(name)))
     return best
 
 
 def _search_types(scores: dict, main: str) -> list[str]:
-    """Labels close to the winner, so a search for either one can find this cluster."""
-    top = float(scores.get(main, 0.0))
+    """Direction labels close to the winner, so a search for either one can find this cluster."""
+    top = float(scores.get(main, 0.0) or 0.0)
     gap = float(THRESHOLDS["close_gap"])
     floor = float(THRESHOLDS["close_floor"])
     names = []
-    for name in TYPES:
-        score = float(scores.get(name, 0.0))
+    for name in DIRECTIONS:
+        score = float(scores.get(name, 0.0) or 0.0)
         if name == main or (score >= floor and top - score <= gap):
             names.append(name)
     return names
+
+
+def apply_direction_groups(payload: dict) -> dict:
+    """Set each cluster's group name from the four direction scores."""
+    for cluster in payload.get("clusters") or []:
+        scores = cluster.get("scores") or {}
+        main = _main_type(scores)
+        cluster["main_type"] = main
+        cluster["search_types"] = _search_types(scores, main)
+        cluster["description"] = SENTENCES[main]
+    return payload
 
 
 def _angular_by_cell(tracks: pd.DataFrame, poa_x: float, poa_y: float) -> dict:
@@ -171,7 +179,7 @@ def build_motion_types(folder: Path) -> dict:
                 "n_cells": int(cluster.get("n_cells") or len(cell_ids)),
                 "main_type": main,
                 "search_types": _search_types(scores, main),
-                "description": SENTENCES[main].format(place=place),
+                "description": SENTENCES[main],
                 "scores": scores,
             }
         )

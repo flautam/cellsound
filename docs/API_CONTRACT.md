@@ -146,14 +146,14 @@ Reads `output/jobs/{job_id}/motion_types.json`. If that file is missing but the 
 An example is `frontend/mock/motion_types.json`.
 
 ## 12. Sort videos by behavior: `GET /api/sort` and `POST /api/sort`
-The sorter sends behavior labels to Grok. It does not send the video file. The API key is read on the server from `XAI_API_KEY`. If that variable is unset, the server does not invent an answer.
+Sorting matches the words up, down, left, and right in the behavior labels already stored for the videos. Phrases such as "move up", "going left", and "toward the top" count as those directions. The server writes the one-sentence reason itself. It does not call an outside service.
 
-`GET /api/sort` when the key is missing:
+`GET /api/sort`:
 
 ```json
 {
-  "configured": false,
-  "message": "Sorting is unavailable because the server has no API key. Videos stay in their current order, with their behavior labels."
+  "configured": true,
+  "message": "Ask a question to sort these videos by behavior. For example: show videos where cells move up."
 }
 ```
 
@@ -169,19 +169,19 @@ The sorter sends behavior labels to Grok. It does not send the video file. The A
 }
 ```
 
-The server loads each job's behavior labels and sends those labels with the question. A successful sort, also saved as `frontend/mock/sort.json`:
+The server loads each job's behavior labels. A video object may instead include `behavior`, `main_type`, `search_types`, or `behaviors` when those labels are not stored yet. Matching videos come first. A question that names more than one direction keeps videos that match any of them, with closer matches first. A successful sort, also saved as `frontend/mock/sort.json`:
 
 ```json
 {
   "configured": true,
   "job_ids": ["d4e5f6", "a1b2c3"],
-  "reason": "The video whose cells move up is listed first."
+  "reason": "These videos mostly move up."
 }
 ```
 
-If the key is missing, `POST` still returns `200` with `"configured": false`, the original `job_ids` order, and a `reason` that says sorting is unavailable. A failed Grok call returns `502 { "error": "sort_failed", "message": "Sorting could not finish. Videos stay in their current order." }`.
+If the question names no direction, `POST` still returns `200` with the original `job_ids` order and `"reason": "The question needs a direction: up, down, left, or right."` An empty question is `400 { "error": "empty_question", "message": "Type a question before sorting." }`. No videos is `400 { "error": "no_videos", "message": "There are no videos to sort." }`.
 
 ## Motion types file
 Written beside one finished job as `output/jobs/{job_id}/motion_types.json`. Existing job endpoints are unchanged. An example is `frontend/mock/motion_types.json`.
 
-Each cluster has one main label, a `search_types` list, and a 0–1 score for every type. A search for any label in `search_types` can find that cluster. A second label is added when its score is within `close_gap` of the winner and at least `close_floor`. Types: `still`, `left`, `right`, `up`, `down`, `inward`, `outward`, `circling clockwise`, `circling counterclockwise`. Up is toward the top of the image. Clockwise is clockwise on the image. Inward means toward the Point of Audio when one was saved, otherwise the image center. Scores use pixels per frame. The thresholds live in `backend/motion_types.py`.
+Each cluster has one main label, a `search_types` list, and a 0–1 score for every measured pattern. A search for any label in `search_types` can find that cluster. A second label is added when its score is within `close_gap` of the winner and at least `close_floor`. The group name and every search label are only `up`, `down`, `left`, or `right`. Up is negative vy, toward the top of the image. Down is positive vy. Left is negative vx. Right is positive vx. If still, inward, outward, or circling would have scored highest, the group name is the strongest of those four directions instead. Extra score keys may still be present. Scores use pixels per frame. The thresholds live in `backend/motion_types.py`.
