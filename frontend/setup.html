@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Point of Audio and settings — Cell Migration Sonification</title>
+  <title>Analysis settings — Cellsound</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" href="img/logo.png" type="image/png">
 </head>
@@ -45,7 +45,7 @@
 <nav class="steps" aria-label="Analysis steps">
   <ol>
     <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
-    <li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
+    <li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Analysis settings</a></li>
     <li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>Overview</a></li>
     <li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Detailed analysis</a></li>
     <li><a class="step-link" data-step-link="5" href="#"><span class="badge badge-5" aria-hidden="true">5</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
@@ -58,15 +58,10 @@
   <div class="hero-inner">
     <div class="hero-bar">
       <p class="step-kicker">Step 2 of 5</p>
-      <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
-        <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
-        <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
-        <span data-pause-label>Pause animations</span>
-      </button>
     </div>
     <h1>Place your Point of Audio</h1>
     <p class="lede">The Point of Audio is where you stand to listen. Each video uses one tone. The pulse is the beat. Pitch rises when something moves toward this point and falls when it moves away.</p>
-    <p>This Point of Audio is used for all uploaded videos in the batch.</p>
+    <p><strong>This Point of Audio will be set for all uploaded videos</strong> in this set. Place it once, then run analysis on every video with the same listening point.</p>
     <p class="calib-kept" id="calib-kept"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg><span>Checking the calibration from upload.</span></p>
   </div>
 </div>
@@ -151,9 +146,19 @@
     </div>
     <p id="run-error" class="error" hidden></p>
     <div class="flow">
-      <button type="button" class="btn btn-primary" id="run">Run analysis</button>
+      <button type="button" class="btn btn-primary" id="run">Run analysis for all videos</button>
       <button type="button" class="btn btn-line" id="reset">Reset to defaults</button>
     </div>
+  </section>
+  <section class="card" id="analyze-progress" hidden aria-labelledby="analyze-prog-h">
+    <h2 id="analyze-prog-h">Analysis progress</h2>
+    <p class="hint" id="analyze-prog-hint">Clustering cells and writing summaries for each video.</p>
+    <div class="field">
+      <label id="analyze-label" for="analyze-prog">Not started</label>
+      <div class="bar" aria-hidden="true"><span id="analyze-bar-fill"></span></div>
+      <progress id="analyze-prog" class="sr" max="100" value="0">0%</progress>
+    </div>
+    <p id="analyze-status" role="status" aria-live="polite" aria-atomic="true">Waiting to run.</p>
   </section>
 </div>
 </main>

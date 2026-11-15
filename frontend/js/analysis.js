@@ -1,4 +1,4 @@
-/* Analysis: muted overview of all chunks, then listen to one highlighted chunk. */
+/* Detailed analysis: shortlisted video tabs, muted overview, split chunk panel. */
 const statusText = document.getElementById("status-text");
 const playButton = document.getElementById("play");
 const playLabel = document.getElementById("play-label");
@@ -7,11 +7,12 @@ const overviewVideo = document.getElementById("overview-video");
 const chunkVideo = document.getElementById("chunk-video");
 const chunkDetail = document.getElementById("chunk-detail");
 const chunkPicks = document.getElementById("chunk-picks");
+const videoTabs = document.getElementById("video-tabs");
 const pos = document.getElementById("pos");
 const posVisible = document.getElementById("pos-visible");
-const beatDots = Array.from(document.querySelectorAll("#beat-dots i"));
-const pitchFill = document.getElementById("pitch-fill");
 
+let shortlist = [];
+let activeJob = "";
 let summary = null;
 let clusters = [];
 let current = -1;
@@ -36,10 +37,6 @@ function signed(value, places) {
   return "0";
 }
 
-function toneLabel() {
-  return "one tone for this video";
-}
-
 function selected() {
   return current >= 0 ? clusters[current] : null;
 }
@@ -53,6 +50,13 @@ function audioName(cluster) {
   return String(name).replace(/\.wav$/i, "");
 }
 
+function briefChunk(cluster, index) {
+  const path = (cluster.start_region || "?") + " → " + (cluster.end_region || "?");
+  if (index === 0) return "Top trend match · " + path;
+  if (cluster.unusual) return "Against trend · " + path;
+  return "~" + (cluster.n_cells || 0) + " cells · " + path;
+}
+
 function setPlaying(on) {
   playing = on;
   if (!on) tone = null;
@@ -64,7 +68,6 @@ function setPlaying(on) {
   if (!on) {
     clearInterval(cueTimer);
     cueTimer = null;
-    paintCues(false);
     if (chunkVideo && !chunkVideo.paused) chunkVideo.pause();
   }
 }
@@ -75,28 +78,8 @@ function halt(message) {
   if (message) say(message);
 }
 
-function paintCues(on) {
-  document.getElementById("wave").setAttribute("aria-hidden", on ? "false" : "true");
-  if (!on) {
-    pitchFill.style.width = "0%";
-    beatDots.forEach(function (dot) { dot.className = ""; });
-    return;
-  }
-  const cluster = selected();
-  const radial = cluster && cluster.mean_radial_v != null ? Number(cluster.mean_radial_v) : 0;
-  const toward = Math.max(0, Math.min(1, 0.5 - radial / 8));
-  pitchFill.style.width = Math.round(toward * 100) + "%";
-  const speed = cluster && cluster.mean_speed != null ? Number(cluster.mean_speed) : 0;
-  const level = Math.max(0, Math.min(beatDots.length - 1, Math.round(speed)));
-  beatDots.forEach(function (dot, index) {
-    dot.className = index <= level ? "on" : "";
-  });
-}
-
 function syncChunkVideo(shouldPlay, forceSeek) {
   if (!chunkVideo || !chunkVideo.src) return;
-  // Seeking every cue tick made playback stutter. Only jump when starting,
-  // scrubbing, or when audio and video drift apart.
   if (forceSeek && tone && tone.ready && tone.ready() && chunkVideo.duration) {
     const want = tone.currentRatio() * chunkVideo.duration;
     if (forceSeek === true || Math.abs((chunkVideo.currentTime || 0) - want) > 0.3) {
@@ -127,7 +110,6 @@ function startCueLoop() {
     if (!playing || !tone || !tone.ready()) return;
     const ratio = tone.currentRatio();
     if (!scrubbing) updatePosLabel(ratio);
-    // Keep video running; only correct large drift (do not seek every tick).
     syncChunkVideo(true, "drift");
     if (ratio >= 0.999) {
       halt("Finished this chunk.");
@@ -137,31 +119,21 @@ function startCueLoop() {
 
 function playSelected() {
   const cluster = selected();
-  const job = currentJobId();
-  if (!cluster || !job) return;
+  if (!cluster || !activeJob) return;
   halt();
   setAppVolume(document.getElementById("vol").value);
   const ratio = Number(pos.value) / Number(pos.max);
-  // Rate is always 1× — half-speed is baked into the chunk MP4 + WAV length.
-  tone = playRecording(audioUrl(job, audioName(cluster)), {
+  tone = playRecording(audioUrl(activeJob, audioName(cluster)), {
     rate: 1,
     ratio: ratio,
     onEnded: function () { halt("Finished this chunk."); },
     onError: function () { halt("This chunk’s sound could not play."); }
   });
   setPlaying(true);
-  paintCues(true);
   if (chunkVideo) chunkVideo.playbackRate = 1;
   syncChunkVideo(true, true);
   startCueLoop();
-  say("Playing chunk " + cluster.cluster_id + ", " + toneLabel(cluster) + ".");
-}
-
-function importanceNote(cluster, index) {
-  if (index === 0) return "Strongest match to the main trend — start here.";
-  if (cluster.unusual) return "Moves against the main trend — worth a look.";
-  if ((cluster.rank || 99) <= 3) return "Strong trend support — high priority.";
-  return "Lower priority relative to the main trend.";
+  say("Playing chunk " + cluster.cluster_id + ".");
 }
 
 function fillPick(cluster, index) {
@@ -170,20 +142,11 @@ function fillPick(cluster, index) {
   const text = document.getElementById("pick-text-" + cluster.cluster_id);
   text.replaceChildren();
   const name = document.createElement("strong");
-  name.textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
+  name.textContent = "Chunk " + cluster.cluster_id;
   const meta = document.createElement("span");
-  meta.textContent = "~" + cluster.n_cells + " cells · " + toneLabel() + " · rank " + cluster.rank;
-  const why = document.createElement("span");
-  why.textContent = importanceNote(cluster, index);
+  meta.textContent = briefChunk(cluster, index);
   text.appendChild(name);
   text.appendChild(meta);
-  text.appendChild(why);
-  if (cluster.unusual) {
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = "Unusual";
-    text.appendChild(tag);
-  }
   if (cluster === selected()) button.setAttribute("aria-current", "true");
   else button.removeAttribute("aria-current");
 }
@@ -197,9 +160,9 @@ function showDetail() {
   const dot = document.getElementById("detail-dot");
   dot.textContent = String(cluster.cluster_id);
   dot.style.background = cluster.color;
-  document.getElementById("detail-h").textContent = "Chunk " + cluster.cluster_id + ": " + cluster.name;
+  document.getElementById("detail-h").textContent = "Chunk " + cluster.cluster_id + ": " + (cluster.name || "");
   document.getElementById("detail-meta").textContent =
-    "~" + cluster.n_cells + " cells · rank " + cluster.rank + " of " + clusters.length + " · " + importanceNote(cluster, clusters.indexOf(cluster));
+    "~" + cluster.n_cells + " cells · rank " + cluster.rank + " of " + clusters.length;
   document.getElementById("detail-desc").textContent = cluster.description || "";
   document.getElementById("cmp-caption").textContent = "Chunk " + cluster.cluster_id + " compared with the whole video";
   document.getElementById("cmp-speed").textContent = plain(cluster.mean_speed, 1) + " " + units.speed;
@@ -209,28 +172,23 @@ function showDetail() {
   document.getElementById("cmp-radial").textContent = signed(cluster.mean_radial_v, 1) + " " + units.speed;
   document.getElementById("all-radial").textContent = signed(pop.mean_radial_v, 1) + " " + units.speed;
   document.getElementById("cmp-path").textContent = (cluster.start_region || "?") + " → " + (cluster.end_region || "?");
-  document.getElementById("tone-note").textContent =
-    "Each video uses one tone, not a different tone for each cluster. The pulse is the beat. Pitch rises when something moves toward the Point of Audio, and falls when it moves away. Volume tells how far away something is. Left and right computer speakers tell direction. Surround-sound headphones give a two-dimensional sense of where the motion is.";
   playLabel.textContent = "Play this chunk " + cluster.cluster_id;
   clusters.forEach(fillPick);
 
-  const job = currentJobId();
-  chunkVideo.playbackRate = 0.5;
-  chunkVideo.defaultPlaybackRate = 0.5;
-  chunkVideo.src = apiPath("/api/jobs/" + encodeURIComponent(job) + "/chunks/" + encodeURIComponent(cluster.cluster_id) + "/video.mp4?v=" + Date.now());
+  chunkVideo.playbackRate = 1;
+  chunkVideo.defaultPlaybackRate = 1;
+  chunkVideo.src = apiPath("/api/jobs/" + encodeURIComponent(activeJob) + "/chunks/" + encodeURIComponent(cluster.cluster_id) + "/video.mp4?v=" + Date.now());
   chunkVideo.load();
   updatePosLabel(0);
 }
 
-function select(index, focusDetail) {
+function select(index) {
   const next = Math.max(0, Math.min(clusters.length - 1, index));
   if (playing) halt();
   current = next;
   showDetail();
   const cluster = selected();
-  say("Chunk " + cluster.cluster_id + " selected. " + importanceNote(cluster, next));
-  if (focusDetail) document.getElementById("detail-h").focus();
-  chunkDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+  say("Chunk " + cluster.cluster_id + " selected.");
 }
 
 function buildList() {
@@ -241,13 +199,14 @@ function buildList() {
     button.type = "button";
     button.className = "pick";
     button.id = "pick-" + cluster.cluster_id;
-    button.addEventListener("click", function () { select(index, true); });
+    button.addEventListener("click", function () { select(index); });
     const dot = document.createElement("span");
     dot.className = "dot";
     dot.setAttribute("aria-hidden", "true");
     dot.style.background = cluster.color;
     dot.textContent = String(cluster.cluster_id);
     const text = document.createElement("span");
+    text.className = "pick-copy";
     text.id = "pick-text-" + cluster.cluster_id;
     button.appendChild(dot);
     button.appendChild(text);
@@ -257,7 +216,7 @@ function buildList() {
   });
   document.getElementById("important-hint").textContent =
     clusters.length
-      ? "Ranked by match to the main trend. Open a chunk to hear it with only that group highlighted."
+      ? "Ranked by match to the main trend. Pick a chunk on the left."
       : "No chunks were found for this video.";
 }
 
@@ -265,8 +224,9 @@ function fillOverview() {
   const pop = summary.population || {};
   const overview = summary.overview || {};
   const units = summary.units || { speed: "µm/min", length: "µm", time: "min" };
+  const active = shortlist.find(function (video) { return video.job_id === activeJob; });
   document.getElementById("hero-lede").textContent =
-    (pop.n_cells || 0) + " cells in " + (pop.n_clusters || 0) + " chunks. Read the overview, then open the chunks that matter most.";
+    (active ? active.name + " · " : "") + (pop.n_cells || 0) + " cells in " + (pop.n_clusters || 0) + " chunks.";
   document.getElementById("desc-text").textContent =
     overview.description || pop.description || "No overview is ready yet.";
   const body = document.getElementById("stats-body");
@@ -290,12 +250,99 @@ function fillOverview() {
   });
   const trust = summary.reliability || {};
   document.getElementById("trust-note").textContent = trust.note || "Tracking finished.";
-  const job = currentJobId();
-  overviewVideo.src = apiPath("/api/jobs/" + encodeURIComponent(job) + "/clusters_overlay.mp4?v=" + Date.now());
+  overviewVideo.src = apiPath("/api/jobs/" + encodeURIComponent(activeJob) + "/clusters_overlay.mp4?v=" + Date.now());
   overviewVideo.load();
   document.getElementById("export-link").href = hrefWithJob("export.html");
   const overviewLink = document.getElementById("overview-link");
   if (overviewLink) overviewLink.href = hrefWithJob("overview.html");
+}
+
+function paintTabs() {
+  videoTabs.replaceChildren();
+  if (shortlist.length <= 1) {
+    videoTabs.hidden = shortlist.length === 0;
+  } else {
+    videoTabs.hidden = false;
+  }
+  shortlist.forEach(function (video, index) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "video-tab";
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", video.job_id === activeJob ? "true" : "false");
+    button.id = "video-tab-" + video.job_id;
+    button.textContent = video.name || ("Video " + (index + 1));
+    button.addEventListener("click", function () {
+      if (video.job_id === activeJob) return;
+      loadJob(video.job_id);
+    });
+    videoTabs.appendChild(button);
+  });
+}
+
+function loadJob(jobId) {
+  halt();
+  activeJob = jobId;
+  setJobId(jobId);
+  current = -1;
+  chunkDetail.hidden = true;
+  chunkPicks.replaceChildren();
+  paintTabs();
+  say("Loading detailed analysis for this video.");
+  return getSummary(jobId).then(function (data) {
+    summary = data;
+    clusters = (summary.clusters || []).slice().sort(byRank);
+    fillOverview();
+    buildList();
+    if (clusters.length) {
+      select(0);
+      say(clusters.length + " chunks ready. Pick one on the left or press Play.");
+    } else {
+      say("No chunks were found for this video.");
+    }
+  }).catch(function (error) {
+    document.getElementById("hero-lede").textContent = "This video could not load.";
+    document.getElementById("desc-text").textContent = error.message || "Run Point of Audio analysis first.";
+    say(error.message || "Analysis is not ready yet.");
+  });
+}
+
+function resolveShortlist() {
+  const ids = readShortlist();
+  if (ids.length) {
+    return Promise.all(ids.map(function (id, index) {
+      return Promise.resolve({ job_id: id, name: "Video " + (index + 1) }).then(function (video) {
+        return getBatchNames().then(function (names) {
+          if (names[id]) video.name = names[id];
+          return video;
+        });
+      });
+    }));
+  }
+  const job = currentJobId();
+  if (!job) return Promise.resolve([]);
+  return getBatchNames().then(function (names) {
+    return [{ job_id: job, name: names[job] || "This video" }];
+  });
+}
+
+function getBatchNames() {
+  let stored = "";
+  try {
+    stored = sessionStorage.getItem("cellsound-batch") || "";
+  } catch (error) {
+    stored = "";
+  }
+  if (!stored) return Promise.resolve({});
+  return getBatch(stored).then(function (data) {
+    const map = {};
+    (data.videos || []).forEach(function (video) {
+      if (video.job_id) map[video.job_id] = video.name || video.job_id;
+    });
+    return map;
+  }).catch(function () {
+    return {};
+  });
 }
 
 playButton.addEventListener("click", function () {
@@ -319,19 +366,15 @@ document.getElementById("replay").addEventListener("click", function () {
   playSelected();
 });
 
-document.getElementById("stop").addEventListener("click", function () {
-  halt("All sound stopped.");
-});
-
 document.addEventListener("cellsound-stopped", function () {
   setPlaying(false);
-  say("All sound stopped.");
+  say("Sound stopped.");
 });
 
 document.getElementById("vol").addEventListener("input", function () {
   const value = document.getElementById("vol").value;
   document.getElementById("vol").setAttribute("aria-valuetext", "Volume " + value + " percent");
-  document.getElementById("vol-hint").textContent = "Volume " + value + " percent. Separate from your screen reader.";
+  document.getElementById("vol-hint").textContent = "Volume " + value + " percent.";
   setAppVolume(value);
   if (tone && tone.setVolume) tone.setVolume();
 });
@@ -347,31 +390,22 @@ pos.addEventListener("input", function () {
   }
 });
 
-document.getElementById("how-btn").addEventListener("click", function () {
-  const open = document.getElementById("how-btn").getAttribute("aria-expanded") !== "true";
-  document.getElementById("how-btn").setAttribute("aria-expanded", open ? "true" : "false");
-  document.getElementById("how-panel").hidden = !open;
-  document.getElementById("how-state").textContent = open ? "Hide" : "Show";
-});
-
 document.querySelectorAll("[data-pause-mirror]").forEach(function (button) {
   button.addEventListener("click", function () {
     setPauseAnimations(!(readDisplay().pause));
   });
 });
 
-Promise.all([getSummary(currentJobId())]).then(function (parts) {
-  summary = parts[0];
-  clusters = (summary.clusters || []).slice().sort(byRank);
-  fillOverview();
-  buildList();
-  if (clusters.length) {
-    say("Overview ready. " + clusters.length + " chunks ranked. Open one to listen.");
-  } else {
-    say("Overview ready, but no chunks were found.");
+resolveShortlist().then(function (list) {
+  shortlist = list;
+  if (!shortlist.length) {
+    document.getElementById("hero-lede").textContent = "No videos were shortlisted.";
+    document.getElementById("desc-text").textContent = "Go back to Overview, select video thumbnails, then continue here.";
+    say("Select videos on the Overview page first.");
+    return;
   }
+  saveShortlist(shortlist.map(function (video) { return video.job_id; }));
+  return loadJob(shortlist[0].job_id);
 }).catch(function (error) {
-  document.getElementById("hero-lede").textContent = "The analysis could not load.";
-  document.getElementById("desc-text").textContent = error.message || "Run Point of Audio and analyze first.";
-  say(error.message || "Analysis is not ready yet.");
+  say(error.message || "Detailed analysis could not load.");
 });

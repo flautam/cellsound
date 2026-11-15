@@ -1,14 +1,34 @@
 /* Shared header behavior: text size, contrast, job id, and the step links. */
 const DISPLAY_KEY = "cellsound-display";
 const JOB_KEY = "cellsound-job";
+const SHORTLIST_KEY = "cellsound-shortlist";
 
 const STEPS = [
   { file: "index.html", label: "Upload" },
-  { file: "setup.html", label: "Point of Audio" },
+  { file: "setup.html", label: "Analysis settings" },
   { file: "overview.html", label: "Overview" },
   { file: "analysis.html", label: "Detailed analysis" },
   { file: "export.html", label: "Export" }
 ];
+
+function readShortlist() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(SHORTLIST_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter(Boolean).map(String) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveShortlist(ids) {
+  const list = (ids || []).filter(Boolean).map(String);
+  try {
+    sessionStorage.setItem(SHORTLIST_KEY, JSON.stringify(list));
+  } catch (error) {
+    /* Private browsing can block storage. */
+  }
+  return list;
+}
 
 function readDisplay() {
   const fallback = { size: "1", theme: "light", pause: false };

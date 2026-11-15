@@ -1,4 +1,4 @@
-/* Overview: thumbnails and behavior labels, then an optional behavior sort. */
+/* Overview: selectable thumbnails after tracing + analysis; local direction sort. */
 const statusText = document.getElementById("status-text");
 const videoList = document.getElementById("videos");
 const emptyBox = document.getElementById("empty");
@@ -6,8 +6,20 @@ const sortSection = document.getElementById("sort-section");
 const sortForm = document.getElementById("sort-form");
 const sortButton = document.getElementById("sort-videos");
 const questionInput = document.getElementById("question");
+const nextButton = document.getElementById("next-link");
+const selectAllButton = document.getElementById("select-all");
 
 let videos = [];
+let selected = {};
+let matchIds = {};
+
+const DIRECTIONS = ["left", "right", "up", "down"];
+const DIRECTION_LINES = {
+  left: "These cells mostly move left.",
+  right: "These cells mostly move right.",
+  up: "These cells mostly move up, toward the top of the image.",
+  down: "These cells mostly move down, toward the bottom of the image."
+};
 
 function say(text) {
   if (statusText.textContent !== text) statusText.textContent = text;
@@ -21,21 +33,13 @@ function batchId() {
   }
 }
 
-var DIRECTIONS = ["left", "right", "up", "down"];
-var DIRECTION_LINES = {
-  left: "These cells mostly move left.",
-  right: "These cells mostly move right.",
-  up: "These cells mostly move up, toward the top of the image.",
-  down: "These cells mostly move down, toward the bottom of the image."
-};
-
 function groupDirection(cluster) {
   if (cluster && DIRECTIONS.indexOf(cluster.main_type) >= 0) return cluster.main_type;
-  var scores = (cluster && cluster.scores) || {};
-  var best = DIRECTIONS[0];
-  var bestScore = -1;
+  const scores = (cluster && cluster.scores) || {};
+  let best = DIRECTIONS[0];
+  let bestScore = -1;
   DIRECTIONS.forEach(function (name) {
-    var score = Number(scores[name]);
+    let score = Number(scores[name]);
     if (!isFinite(score)) score = 0;
     if (score > bestScore) {
       best = name;
@@ -63,27 +67,75 @@ function behaviorText(motion) {
   return text;
 }
 
+function briefSummary(summary) {
+  const overview = (summary && summary.overview) || {};
+  const pop = (summary && summary.population) || {};
+  if (overview.description) {
+    const text = String(overview.description);
+    const cut = text.indexOf(". ");
+    return cut > 40 && cut < 160 ? text.slice(0, cut + 1) : text.slice(0, 160) + (text.length > 160 ? "…" : "");
+  }
+  if (pop.stats_line) return pop.stats_line;
+  return "";
+}
+
+function selectedCount() {
+  return videos.filter(function (video) { return selected[video.job_id]; }).length;
+}
+
+function updateContinue() {
+  const count = selectedCount();
+  nextButton.disabled = count === 0;
+  nextButton.textContent = count
+    ? "Continue to detailed analysis (" + count + ")"
+    : "Select videos to continue";
+  document.getElementById("select-hint").textContent = count
+    ? count + " video" + (count === 1 ? "" : "s") + " selected for detailed analysis."
+    : "Select one or more thumbnails to shortlist for detailed analysis.";
+}
+
 function render() {
   videoList.replaceChildren();
   videos.forEach(function (video) {
     const item = document.createElement("li");
-    item.className = "overview-card";
+    item.className = "overview-card"
+      + (selected[video.job_id] ? " is-selected" : "")
+      + (matchIds[video.job_id] ? " is-match" : "");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "overview-select";
+    button.setAttribute("aria-pressed", selected[video.job_id] ? "true" : "false");
+    button.setAttribute(
+      "aria-label",
+      (selected[video.job_id] ? "Selected. " : "Not selected. ") + video.name + ". Activate to toggle."
+    );
+    const mark = document.createElement("span");
+    mark.className = "overview-check";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = selected[video.job_id] ? "✓" : "";
     const heading = document.createElement("h3");
     heading.textContent = video.name;
     const image = document.createElement("img");
     image.src = video.imageUrl;
-    image.alt = video.behavior
-      ? video.name + ". " + video.behavior
-      : "First frame of " + video.name;
+    image.alt = "";
     image.width = 512;
     image.height = 512;
     const summary = document.createElement("p");
     summary.textContent = video.behavior || "Behavior labels are not ready for this video yet.";
-    item.appendChild(heading);
-    item.appendChild(image);
-    item.appendChild(summary);
+    button.appendChild(mark);
+    button.appendChild(heading);
+    button.appendChild(image);
+    button.appendChild(summary);
+    button.addEventListener("click", function () {
+      selected[video.job_id] = !selected[video.job_id];
+      render();
+      say((selected[video.job_id] ? "Selected " : "Removed ") + video.name + ".");
+      updateContinue();
+    });
+    item.appendChild(button);
     videoList.appendChild(item);
   });
+  updateContinue();
 }
 
 function showEmpty(message) {
@@ -91,6 +143,8 @@ function showEmpty(message) {
   document.getElementById("empty-text").textContent = message;
   videoList.hidden = true;
   sortSection.hidden = true;
+  selectAllButton.hidden = true;
+  nextButton.hidden = true;
   say(message);
 }
 
@@ -100,7 +154,7 @@ function loadCatalog() {
     return getBatch(storedBatch).then(function (data) {
       return (data.videos || []).map(function (video) {
         return { job_id: video.job_id, name: video.name || video.job_id };
-      });
+      }).filter(function (video) { return video.job_id; });
     });
   }
   const job = currentJobId();
@@ -110,22 +164,34 @@ function loadCatalog() {
 
 function attachLabels(catalog) {
   return Promise.all(catalog.map(function (video) {
-    return getMotionTypes(video.job_id).then(function (motion) {
-      video.behavior = behaviorText(motion);
-      video.ready = Boolean(video.behavior);
-      video.imageUrl = frameImageUrl(video.job_id);
-      return video;
+    return getJob(video.job_id).then(function (job) {
+      video.tracked = job.status === "done" || job.stage === "done";
+      return getMotionTypes(video.job_id).then(function (motion) {
+        video.behavior = behaviorText(motion);
+        video.ready = Boolean(video.behavior);
+        video.imageUrl = frameImageUrl(video.job_id);
+        return video;
+      }).catch(function () {
+        return getSummary(video.job_id).then(function (summary) {
+          video.behavior = briefSummary(summary);
+          video.ready = Boolean(video.behavior);
+          video.imageUrl = frameImageUrl(video.job_id);
+          return video;
+        }).catch(function () {
+          video.behavior = "";
+          video.ready = false;
+          video.imageUrl = frameImageUrl(video.job_id);
+          return video;
+        });
+      });
     }).catch(function () {
+      video.tracked = false;
       video.behavior = "";
       video.ready = false;
       video.imageUrl = frameImageUrl(video.job_id);
       return video;
     });
   }));
-}
-
-function applySorter() {
-  sortButton.disabled = false;
 }
 
 sortForm.addEventListener("submit", function (event) {
@@ -146,6 +212,7 @@ sortForm.addEventListener("submit", function (event) {
   }).then(function (result) {
     sortButton.disabled = false;
     const order = (result && result.job_ids) || [];
+    matchIds = {};
     if (order.length) {
       const byId = {};
       videos.forEach(function (video) { byId[video.job_id] = video; });
@@ -153,6 +220,7 @@ sortForm.addEventListener("submit", function (event) {
       order.forEach(function (id) {
         if (byId[id]) {
           next.push(byId[id]);
+          matchIds[id] = true;
           delete byId[id];
         }
       });
@@ -160,41 +228,63 @@ sortForm.addEventListener("submit", function (event) {
       videos = next;
       render();
     }
-    say((result && result.reason) || "Videos are ordered to match your question.");
+    say((result && result.reason) || "Videos that match your search are outlined in green.");
   }).catch(function (error) {
     sortButton.disabled = false;
     say(error.message || "Sorting could not finish. Videos stay in their current order.");
   });
 });
 
-document.querySelectorAll("[data-pause-mirror]").forEach(function (button) {
-  button.addEventListener("click", function () {
-    setPauseAnimations(!(readDisplay().pause));
+selectAllButton.addEventListener("click", function () {
+  const allOn = selectedCount() === videos.length;
+  videos.forEach(function (video) {
+    selected[video.job_id] = !allOn;
   });
+  render();
+  say(allOn ? "Cleared the selection." : "Selected all videos.");
 });
 
-document.getElementById("trace-link").href = hrefWithJob("analysis.html");
-document.getElementById("next-link").href = hrefWithJob("analysis.html");
+nextButton.addEventListener("click", function () {
+  const ids = videos.filter(function (video) { return selected[video.job_id]; }).map(function (video) { return video.job_id; });
+  if (!ids.length) {
+    say("Select at least one video thumbnail before continuing.");
+    return;
+  }
+  saveShortlist(ids);
+  setJobId(ids[0]);
+  window.location.href = hrefWithJob("analysis.html");
+});
+
+document.getElementById("trace-link").href = hrefWithJob("setup.html");
 
 loadCatalog().then(function (catalog) {
   if (!catalog.length) {
-    showEmpty("Finish cell tracing first. Open detailed analysis after you upload a video and place the Point of Audio.");
+    showEmpty("Upload a video and finish cell tracing first, then open analysis settings and run analysis.");
     return null;
   }
   return attachLabels(catalog).then(function (ready) {
     const traced = ready.filter(function (video) { return video.ready; });
     if (!traced.length) {
-      showEmpty("Finish cell tracing first. Behavior labels appear here after detailed analysis has followed the cells.");
+      const trackedOnly = ready.some(function (video) { return video.tracked; });
+      showEmpty(trackedOnly
+        ? "Cell tracing finished, but summaries are not ready yet. Open analysis settings and run analysis first."
+        : "Finish cell tracing first, then open analysis settings and run analysis.");
       return null;
     }
     videos = ready;
+    const prior = readShortlist();
+    ready.forEach(function (video) {
+      selected[video.job_id] = prior.length ? prior.indexOf(video.job_id) >= 0 : true;
+    });
     emptyBox.hidden = true;
     videoList.hidden = false;
     sortSection.hidden = false;
+    selectAllButton.hidden = false;
+    nextButton.hidden = false;
+    sortButton.disabled = false;
     render();
-    say(traced.length + (traced.length === 1 ? " video has a behavior summary." : " videos have behavior summaries."));
-    return getSorter().then(applySorter).catch(applySorter);
+    say(traced.length + (traced.length === 1 ? " video has a behavior summary. Select thumbnails for detailed analysis." : " videos have behavior summaries. Select thumbnails for detailed analysis."));
   });
 }).catch(function (error) {
-  showEmpty(error.message || "Finish cell tracing first.");
+  showEmpty(error.message || "Finish cell tracing and analysis settings first.");
 });

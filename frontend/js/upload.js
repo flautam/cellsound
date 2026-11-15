@@ -1,4 +1,4 @@
-/* Upload page: check the video, then show pretend tracking progress. */
+/* Upload page: check the video, then show tracking progress for one or many files. */
 const MAX_BYTES = 100 * 1024 * 1024;
 const videoInput = document.getElementById("video");
 const fileName = document.getElementById("file-name");
@@ -21,7 +21,7 @@ let batchTimer = null;
 let lastMilestone = -1;
 const batchList = document.getElementById("batch-list");
 const batchHeading = document.getElementById("batch-progress-h");
-const singleProgress = progress.closest(".field");
+const overallProgress = document.getElementById("overall-progress");
 
 function showFileError(message) {
   fileError.hidden = false;
@@ -102,10 +102,22 @@ function saveCalibration(values) {
 
 function setCheck(id, word, kind) {
   const item = document.getElementById(id);
-  item.querySelector("strong").textContent = word;
+  if (!item) return;
+  const strong = item.querySelector("strong");
+  if (strong) strong.textContent = word;
   const dot = item.querySelector(".dot");
+  if (!dot) return;
   dot.classList.remove("now", "done");
   if (kind) dot.classList.add(kind);
+}
+
+function setBar(fraction) {
+  const clamped = Math.max(0, Math.min(1, fraction || 0));
+  progress.max = 100;
+  progress.value = Math.round(clamped * 100);
+  progress.textContent = Math.round(clamped * 100) + "%";
+  const fill = document.getElementById("bar-fill");
+  if (fill) fill.style.transform = "scaleX(" + clamped + ")";
 }
 
 function say(text) {
@@ -118,6 +130,7 @@ function showProgress(data) {
   if (data.status === "error") {
     setCheck("check-received", "Done", "done");
     setCheck("check-track", "Stopped", "");
+    setCheck("check-ready", "Waiting", "");
     continueLink.hidden = true;
     say(data.message || "Tracking stopped because of an error.");
     return;
@@ -126,22 +139,26 @@ function showProgress(data) {
   const frame = Math.min(data.frame || 0, total);
   const done = data.status === "done";
   const fraction = total === 0 ? 0 : frame / total;
-  progress.max = total;
-  progress.value = frame;
-  progress.textContent = Math.round(fraction * 100) + "%";
-  const fill = document.getElementById("bar-fill");
-  if (fill) fill.style.transform = "scaleX(" + fraction + ")";
-  progressLabel.textContent = "Finding and following nuclei: frame " + frame + " of " + total;
+  setBar(fraction);
+  progressLabel.textContent = done
+    ? "Tracking finished for this video."
+    : "Finding and following nuclei: frame " + frame + " of " + total;
+  document.getElementById("check-received-text").innerHTML =
+    "Video received, " + total + " frames: <strong></strong>";
+  document.getElementById("check-track-text").innerHTML =
+    "Detecting and tracking nuclei: <strong></strong>";
+  document.getElementById("check-ready-text").innerHTML =
+    "Ready for Point of Audio: <strong></strong>";
   setCheck("check-received", "Done", "done");
   setCheck("check-track", done ? "Done" : "In progress", done ? "done" : "now");
-  document.getElementById("received-count").textContent = String(total);
+  setCheck("check-ready", done ? "Done" : "Waiting", done ? "done" : "");
 
-  const percent = Math.round((frame / total) * 100);
+  const percent = Math.round(fraction * 100);
   const milestone = done ? 100 : Math.floor(percent / 25) * 25;
   if (milestone !== lastMilestone && (milestone >= 25 || done)) {
     lastMilestone = milestone;
     say(done
-      ? "Tracking finished. Your results are ready. Continue to Point of Audio and settings."
+      ? "Tracking finished. Continue to analysis settings — that Point of Audio will apply to every uploaded video."
       : "Tracking is " + milestone + " percent done. We will announce when it finishes.");
   }
   continueLink.hidden = !done;
@@ -189,40 +206,128 @@ drop.addEventListener("drop", function (event) {
 });
 
 function showSingleProgress(on) {
-  if (singleProgress) singleProgress.hidden = !on;
-  document.querySelector(".checks").hidden = !on;
+  overallProgress.hidden = false;
   batchHeading.hidden = on;
   batchList.hidden = on;
 }
 
-function drawBatch(data) {
-  batchList.replaceChildren();
-  (data.videos || []).forEach(function (video) {
-    const item = document.createElement("li");
+function videoStepLabel(video) {
+  if (video.status === "done") return "3. Ready";
+  if (video.status === "error") return "Stopped";
+  if (video.status === "running" || (video.total_frames && video.frame > 0)) {
     const total = video.total_frames || 0;
     const frame = video.frame || 0;
-    const where = video.status === "done"
-      ? "Ready"
-      : video.status === "error"
-        ? "Stopped"
-        : total
-          ? "Frame " + frame + " of " + total
-          : "Waiting";
-    item.textContent = video.name + ": " + where + ". " + (video.message || "");
+    return total ? "2. Tracking frame " + frame + " of " + total : "2. Tracking";
+  }
+  if (video.status === "queued" || video.status === "received") return "1. Received — waiting";
+  return "1. Waiting";
+}
+
+function drawBatch(data) {
+  const videos = data.videos || [];
+  batchList.replaceChildren();
+  let frameSum = 0;
+  let frameTotal = 0;
+  let ready = 0;
+  videos.forEach(function (video, index) {
+    const item = document.createElement("li");
+    item.className = "batch-item";
+    const total = video.total_frames || 0;
+    const frame = video.frame || 0;
+    if (video.status === "done") {
+      ready += 1;
+      frameSum += total || 1;
+      frameTotal += total || 1;
+    } else if (total > 0) {
+      frameSum += frame;
+      frameTotal += total;
+    } else {
+      frameTotal += 1;
+    }
+    const title = document.createElement("div");
+    title.className = "batch-item-title";
+    const num = document.createElement("span");
+    num.className = "dot" + (video.status === "done" ? " done" : video.status === "running" ? " now" : "");
+    num.setAttribute("aria-hidden", "true");
+    num.textContent = String(index + 1);
+    const name = document.createElement("strong");
+    name.textContent = video.name || ("Video " + (index + 1));
+    title.appendChild(num);
+    title.appendChild(name);
+    const steps = document.createElement("ol");
+    steps.className = "batch-steps";
+    ["Received", "Tracking nuclei", "Ready for Point of Audio"].forEach(function (label, stepIndex) {
+      const step = document.createElement("li");
+      let state = "Waiting";
+      let kind = "";
+      if (stepIndex === 0) {
+        state = "Done";
+        kind = "done";
+      } else if (stepIndex === 1) {
+        if (video.status === "done") {
+          state = "Done";
+          kind = "done";
+        } else if (video.status === "error") {
+          state = "Stopped";
+        } else if (video.status === "running" || frame > 0) {
+          state = total ? ("Frame " + frame + " of " + total) : "In progress";
+          kind = "now";
+        }
+      } else if (stepIndex === 2) {
+        if (video.status === "done") {
+          state = "Done";
+          kind = "done";
+        }
+      }
+      step.innerHTML = "<span class=\"dot" + (kind ? " " + kind : "") + "\" aria-hidden=\"true\">" + (stepIndex + 1) + "</span><span>" + label + ": <strong>" + state + "</strong></span>";
+      steps.appendChild(step);
+    });
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = videoStepLabel(video) + (video.message ? " — " + video.message : "");
+    item.appendChild(title);
+    item.appendChild(steps);
+    item.appendChild(note);
     batchList.appendChild(item);
   });
-  const ready = (data.videos || []).filter(function (video) { return video.status === "done"; }).length;
-  const total = (data.videos || []).length;
+
+  const totalVideos = videos.length || 1;
+  const overall = frameTotal > 0 ? frameSum / frameTotal : ready / totalVideos;
+  setBar(data.status === "done" ? 1 : overall);
+  progressLabel.textContent = data.status === "done"
+    ? totalVideos + " of " + totalVideos + " videos ready."
+    : "Overall tracking progress across " + totalVideos + " videos (" + ready + " ready).";
+
+  document.getElementById("check-received-text").innerHTML =
+    totalVideos + " videos received: <strong></strong>";
+  document.getElementById("check-track-text").innerHTML =
+    "Detecting and tracking nuclei: <strong></strong>";
+  document.getElementById("check-ready-text").innerHTML =
+    "Ready for Point of Audio: <strong></strong>";
+  setCheck("check-received", "Done", "done");
+  setCheck(
+    "check-track",
+    data.status === "done" ? "Done" : (ready + " of " + totalVideos + " finished"),
+    data.status === "done" ? "done" : "now"
+  );
+  setCheck(
+    "check-ready",
+    data.status === "done" ? "Done" : "Waiting",
+    data.status === "done" ? "done" : ""
+  );
+
   if (data.status === "done") {
-    say(ready + " of " + total + " videos are ready.");
+    say(ready + " of " + totalVideos + " videos are ready. The same Point of Audio will apply to all of them.");
     return;
   }
   if (data.status === "error") {
     say("Every video stopped because of an error.");
     return;
   }
-  const current = (data.videos || []).find(function (video) { return video.status === "running"; });
-  say(current ? "Working on " + current.name + ". " + ready + " of " + total + " finished." : "Videos are queued.");
+  const current = videos.find(function (video) { return video.status === "running"; });
+  say(current
+    ? "Working on " + current.name + ". " + ready + " of " + totalVideos + " finished."
+    : "Videos are queued.");
 }
 
 function pollBatch(batchId) {
@@ -261,6 +366,7 @@ startButton.addEventListener("click", function () {
   saveCalibration(calibration);
   startButton.disabled = true;
   continueLink.hidden = true;
+  setCheck("check-ready", "Waiting", "");
   if (chosenFiles.length === 1) {
     showSingleProgress(true);
     const body = new FormData();
@@ -281,7 +387,9 @@ startButton.addEventListener("click", function () {
   const body = new FormData();
   chosenFiles.forEach(function (file) { body.append("videos", file); });
   appendCalibration(body, calibration);
-  say("Upload started. Videos will run one at a time.");
+  say("Upload started. Videos will track one at a time. Progress updates below.");
+  batchHeading.hidden = false;
+  batchList.hidden = false;
   batchHeading.focus();
   createBatch(body).then(function (data) {
     try { sessionStorage.setItem("cellsound-batch", data.batch_id); } catch (error) { /* later pages can still use the address */ }

@@ -219,32 +219,66 @@ function jobsForThisPoint() {
   });
 }
 
+function setAnalyzeProgress(done, total, message) {
+  const panel = document.getElementById("analyze-progress");
+  const bar = document.getElementById("analyze-prog");
+  const fill = document.getElementById("analyze-bar-fill");
+  const label = document.getElementById("analyze-label");
+  const note = document.getElementById("analyze-status");
+  if (!panel) return;
+  panel.hidden = false;
+  const count = Math.max(1, total || 1);
+  const finished = Math.max(0, Math.min(count, done || 0));
+  const fraction = finished / count;
+  bar.max = 100;
+  bar.value = Math.round(fraction * 100);
+  bar.textContent = Math.round(fraction * 100) + "%";
+  if (fill) fill.style.transform = "scaleX(" + fraction + ")";
+  label.textContent = finished >= count
+    ? "Analysis finished for " + count + " video" + (count === 1 ? "" : "s") + "."
+    : "Analyzing video " + Math.min(count, finished + 1) + " of " + count;
+  if (note) note.textContent = message || label.textContent;
+  say(message || label.textContent);
+}
+
 document.getElementById("run").addEventListener("click", function () {
   const body = analysisBody();
   runError.hidden = true;
   document.getElementById("run").disabled = true;
-  say("Running the analysis.");
+  say("Running the analysis. This Point of Audio will be set for all uploaded videos.");
   try {
     sessionStorage.setItem("cellsound-analysis", JSON.stringify(body));
   } catch (error) {
     /* The next page can still load the saved summary. */
   }
   jobsForThisPoint().then(function (ids) {
+    setAnalyzeProgress(0, ids.length, "Starting analysis for " + ids.length + " video" + (ids.length === 1 ? "" : "s") + ". Same Point of Audio for each.");
     let chain = Promise.resolve();
     ids.forEach(function (id, index) {
       chain = chain.then(function () {
-        say("Running the analysis for video " + (index + 1) + " of " + ids.length + ". The same Point of Audio is used for each video.");
+        setAnalyzeProgress(
+          index,
+          ids.length,
+          "Video " + (index + 1) + " of " + ids.length + ": clustering, summary, overlay, and sound. Same Point of Audio for every video."
+        );
         return analyzeJob(id, body).then(function () {
           return waitUntilDone(id);
+        }).then(function () {
+          setAnalyzeProgress(
+            index + 1,
+            ids.length,
+            "Finished video " + (index + 1) + " of " + ids.length + "."
+          );
         });
       });
     });
     return chain.then(function () {
-      return ids[0];
+      return { firstId: ids[0], count: ids.length };
     });
-  }).then(function (firstId) {
-    setJobId(firstId);
-    window.location.href = hrefWithJob("analysis.html");
+  }).then(function (result) {
+    setJobId(result.firstId);
+    setAnalyzeProgress(result.count, result.count, "Analysis finished. Opening the overview next.");
+    window.location.href = hrefWithJob("overview.html");
   }).catch(function (error) {
     document.getElementById("run").disabled = false;
     runError.hidden = false;
