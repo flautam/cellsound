@@ -37,11 +37,13 @@ CPU_BATCH_SIZE = 1
 
 
 def choose_device():
-    """Pick CUDA when it exists, otherwise the CPU. Prints the choice."""
+    """Pick CUDA when it exists, otherwise the CPU. Prints the choice.
+
+    Apple MPS is skipped: Cellpose regularly aborts the whole process with an
+    NSException on this Mac, which kills the website server mid-upload.
+    """
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
     else:
         device = torch.device("cpu")
     print(f"Using device: {device.type}")
