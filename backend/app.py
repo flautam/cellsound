@@ -31,7 +31,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.motion_types import write_motion_types
-from backend.pipeline import run_job_analysis
+from backend.pipeline import overlay_playback_fps, run_job_analysis
 from backend.track import choose_device, limit_for_cpu, link_tracks, segment_nuclei, select_frames
 from backend.video import load_video
 
@@ -495,7 +495,7 @@ def chunk_overlay(job_id: str, cluster_id: int):
         one.to_csv(cl, index=False)
         sum_one.to_csv(sm, index=False)
         meta = _read_meta(job_id)
-        fps = float(meta.get("fps") or 15.0)
+        fps = overlay_playback_fps(meta.get("fps"))
         # Render in a temp folder so we do not overwrite the full-field clusters_map.png.
         tmp_out = tmp_dir / f"chunk_{int(cluster_id)}_overlay.mp4"
         render(video_path, motion_path, cl, sm, tmp_out, fps=fps)

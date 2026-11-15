@@ -93,32 +93,14 @@ function paintCues(on) {
   });
 }
 
-function timelineRate() {
-  const value = Number(document.getElementById("rate").value);
-  return value > 0 ? value : 0.5;
-}
-
-function fitChunkSpeed() {
-  const rate = timelineRate();
-  if (tone && tone.setRate) tone.setRate(rate);
-  if (!chunkVideo) return;
-  let videoRate = rate;
-  const audioDuration = tone && tone.duration ? tone.duration() : 0;
-  if (audioDuration > 0 && chunkVideo.duration > 0 && isFinite(chunkVideo.duration)) {
-    videoRate = rate * (chunkVideo.duration / audioDuration);
-  }
-  if (Math.abs((chunkVideo.playbackRate || 0) - videoRate) > 0.02) {
-    chunkVideo.playbackRate = videoRate;
-  }
-}
-
-function syncChunkVideo(shouldPlay) {
+function syncChunkVideo(shouldPlay, forceSeek) {
   if (!chunkVideo || !chunkVideo.src) return;
-  fitChunkSpeed();
-  if (tone && tone.ready && tone.ready() && chunkVideo.duration) {
-    const target = tone.currentRatio() * chunkVideo.duration;
-    if (Math.abs((chunkVideo.currentTime || 0) - target) > 0.4) {
-      try { chunkVideo.currentTime = target; } catch (error) { /* seek */ }
+  // Seeking every cue tick made playback stutter. Only jump when starting,
+  // scrubbing, or when audio and video drift apart.
+  if (forceSeek && tone && tone.ready && tone.ready() && chunkVideo.duration) {
+    const want = tone.currentRatio() * chunkVideo.duration;
+    if (forceSeek === true || Math.abs((chunkVideo.currentTime || 0) - want) > 0.3) {
+      try { chunkVideo.currentTime = want; } catch (error) { /* seek */ }
     }
   }
   if (shouldPlay) {
@@ -145,11 +127,12 @@ function startCueLoop() {
     if (!playing || !tone || !tone.ready()) return;
     const ratio = tone.currentRatio();
     if (!scrubbing) updatePosLabel(ratio);
-    syncChunkVideo(true);
+    // Keep video running; only correct large drift (do not seek every tick).
+    syncChunkVideo(true, "drift");
     if (ratio >= 0.999) {
       halt("Finished this chunk.");
     }
-  }, 80);
+  }, 200);
 }
 
 function playSelected() {
@@ -158,17 +141,18 @@ function playSelected() {
   if (!cluster || !job) return;
   halt();
   setAppVolume(document.getElementById("vol").value);
-  const rate = timelineRate();
   const ratio = Number(pos.value) / Number(pos.max);
+  // Rate is always 1× — half-speed is baked into the chunk MP4 + WAV length.
   tone = playRecording(audioUrl(job, audioName(cluster)), {
-    rate: rate,
+    rate: 1,
     ratio: ratio,
     onEnded: function () { halt("Finished this chunk."); },
     onError: function () { halt("This chunk’s sound could not play."); }
   });
   setPlaying(true);
   paintCues(true);
-  syncChunkVideo(true);
+  if (chunkVideo) chunkVideo.playbackRate = 1;
+  syncChunkVideo(true, true);
   startCueLoop();
   say("Playing chunk " + cluster.cluster_id + ", " + toneLabel(cluster) + ".");
 }
@@ -351,16 +335,6 @@ document.getElementById("vol").addEventListener("input", function () {
   setAppVolume(value);
   if (tone && tone.setVolume) tone.setVolume();
 });
-
-document.getElementById("rate").addEventListener("change", function () {
-  fitChunkSpeed();
-});
-
-if (chunkVideo) {
-  chunkVideo.defaultPlaybackRate = 0.5;
-  chunkVideo.playbackRate = 0.5;
-  chunkVideo.addEventListener("loadedmetadata", fitChunkSpeed);
-}
 
 pos.addEventListener("pointerdown", function () { scrubbing = true; });
 pos.addEventListener("pointerup", function () { scrubbing = false; });

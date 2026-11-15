@@ -208,11 +208,24 @@ def _examples():
     }
 
 
-def write_sounds(folder: Path, motion: pd.DataFrame, summary: dict, poa_x: float, poa_y: float, width: int, height: int) -> None:
+def write_sounds(
+    folder: Path,
+    motion: pd.DataFrame,
+    summary: dict,
+    poa_x: float,
+    poa_y: float,
+    width: int,
+    height: int,
+    playback_fps: float | None = None,
+) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     span = max(float(width), float(height), 1.0) / 2
     radial, speed, dist, xs, ys = _columns(motion, None)
-    seconds = max(3.0, len(radial) * 0.5)
+    # Match overlay video length: one sample block per frame at the baked playback FPS
+    # (half the source FPS). Fallback 2 fps ≈ the old 0.5 s/frame default.
+    n_frames = max(1, len(radial))
+    play_fps = float(playback_fps) if playback_fps and float(playback_fps) > 0 else 2.0
+    seconds = max(3.0, n_frames / play_fps)
     layers = []
     for index, cluster in enumerate(summary.get("clusters", [])):
         cluster_id = cluster.get("cluster_id", index + 1)

@@ -17,7 +17,7 @@ Upload MP4 (+ optional `pixel_size_um`, `minutes_per_frame`) → track → set P
 → analyze → analysis page (muted overview video of all chunks + ranked chunks to
 inspect one at a time with sound) → export.
 
-Analyze re-clusters each time. Overlay video uses the source video FPS.
+Analyze re-clusters each time. Overlay / chunk videos are baked at half the source FPS (fixed; not a playback control).
 Calibration is optional; missing scale/time keeps speeds in px/frame.
 
 ## Data formats

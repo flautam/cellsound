@@ -13,6 +13,16 @@ from backend.motion import compute_motion
 from backend.render_cluster_video import render as render_cluster_video
 from backend.sonify import write_sounds
 
+# Chunk / overview overlay videos play at half the source frame rate so
+# motion is easy to follow. Sound length matches that baked playback rate.
+OVERLAY_FPS_FACTOR = 0.5
+
+
+def overlay_playback_fps(source_fps: float | None) -> float:
+    """Fixed half-speed playback FPS for rendered cluster videos."""
+    base = float(source_fps) if source_fps and float(source_fps) > 0 else 15.0
+    return max(0.5, base * OVERLAY_FPS_FACTOR)
+
 
 def _num(value, places: int = 1):
     try:
@@ -101,7 +111,7 @@ def run_job_analysis(
     min_size = int(settings.get("min_size") or DEFAULT_MIN_SIZE)
     stickiness = float(settings.get("stickiness") or DEFAULT_STICKINESS)
     joiner_weight = float(settings.get("joiner_weight", DEFAULT_JOINER_WEIGHT))
-    overlay_fps = float(fps) if fps and float(fps) > 0 else None
+    overlay_fps = overlay_playback_fps(fps)
 
     motion = compute_motion(tracks, poa_x, poa_y) if not tracks.empty else pd.DataFrame()
     motion_path = folder / "motion.csv"
@@ -156,7 +166,16 @@ def run_job_analysis(
         }
         (folder / "summary.json").write_text(json.dumps(summary, indent=2))
         (folder / "traces.json").write_text(json.dumps(traces, indent=2))
-        write_sounds(folder / "sounds", motion, summary, poa_x, poa_y, width, height)
+        write_sounds(
+            folder / "sounds",
+            motion,
+            summary,
+            poa_x,
+            poa_y,
+            width,
+            height,
+            playback_fps=overlay_fps,
+        )
         return summary
 
     clusters_df, cluster_summary = run_clustering(
@@ -214,5 +233,14 @@ def run_job_analysis(
         traces["cluster_video_url"] = None
 
     (folder / "traces.json").write_text(json.dumps(traces, indent=2))
-    write_sounds(folder / "sounds", motion, summary, poa_x, poa_y, width, height)
+    write_sounds(
+        folder / "sounds",
+        motion,
+        summary,
+        poa_x,
+        poa_y,
+        width,
+        height,
+        playback_fps=overlay_fps,
+    )
     return summary

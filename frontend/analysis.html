@@ -115,7 +115,7 @@
     <div class="split" style="align-items:flex-start;margin-top:1em">
       <div style="flex:1 1 16em;min-width:12em;max-width:28rem">
         <video id="chunk-video" playsinline muted preload="auto" aria-label="Video with only the selected chunk highlighted" style="width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)"></video>
-        <p class="hint" style="margin-top:0.5em">Only this chunk is drawn. Sound follows this video’s timeline.</p>
+        <p class="hint" style="margin-top:0.5em">Only this chunk is drawn. Video runs at half the source frame rate so motion is easy to follow. Sound matches that timeline.</p>
       </div>
       <div style="flex:2 1 16em;min-width:14em">
         <div class="flow">
@@ -133,21 +133,10 @@
           <input id="pos" type="range" min="0" max="200" value="0" aria-valuetext="Start of the clip">
           <p class="hint" id="pos-visible" aria-hidden="true">Start of the clip</p>
         </div>
-        <div class="split">
-          <div class="field" style="flex:1 1 10em">
-            <label for="rate">Playback speed</label>
-            <select class="select" id="rate">
-              <option value="0.5" selected>0.5×</option>
-              <option value="1">1×</option>
-              <option value="1.5">1.5×</option>
-              <option value="2">2×</option>
-            </select>
-          </div>
-          <div class="field" style="flex:1 1 12em">
-            <label for="vol">App volume</label>
-            <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent">
-            <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader.</p>
-          </div>
+        <div class="field">
+          <label for="vol">App volume</label>
+          <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent">
+          <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader. Playback speed is fixed at half the source frame rate.</p>
         </div>
         <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Select a chunk above, then press Play.</p>
       </div>
