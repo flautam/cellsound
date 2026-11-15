@@ -98,7 +98,7 @@ function mockFiles(include) {
   const clusters = summary && summary.clusters ? summary.clusters : [];
   const population = summary && summary.population ? summary.population : {};
   if (include.indexOf("audio") !== -1) {
-    const names = ["overview.wav"].concat(clusters.map(function (cluster) { return cluster.audio || "cluster_" + cluster.cluster_id + ".wav"; }));
+    const names = clusters.map(function (cluster) { return cluster.audio || "cluster_" + cluster.cluster_id + ".wav"; });
     files.push({ name: "sounds/README.txt", data: textFile("Sound files in the full export:\n" + names.join("\n") + "\n") });
   }
   if (include.indexOf("text") !== -1) {
@@ -175,7 +175,7 @@ getSummary(currentJobId() || "a1b2c3").then(function (data) {
     });
   }
   const count = data.population ? data.population.n_clusters : 0;
-  if (count) audioNote.textContent = "Overview plus one file for each of the " + count + " clusters.";
+  if (count) audioNote.textContent = "One sound file for each of the " + count + " chunks.";
 }).catch(function () {
   /* The choices still work without the summary. */
 });

@@ -5,8 +5,7 @@ const JOB_KEY = "cellsound-job";
 const STEPS = [
   { file: "index.html", label: "Upload" },
   { file: "setup.html", label: "Point of Audio" },
-  { file: "overview.html", label: "Overview" },
-  { file: "clusters.html", label: "Clusters" },
+  { file: "analysis.html", label: "Analysis" },
   { file: "export.html", label: "Export" }
 ];
 

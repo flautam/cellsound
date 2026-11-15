@@ -358,7 +358,7 @@ def _video_overview_from_chunks(
 
     closing = (
         f"This overview covers {n_cells} tracked cells in {len(chunks)} chunks "
-        f"over {time_phrase}. You can step through each chunk next for where it "
+        f"over {time_phrase}. Open a ranked chunk next to hear it alone — where it "
         f"started, where it went, and how fast it moved."
     )
 

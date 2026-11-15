@@ -358,6 +358,10 @@ def analyze(job_id: str, body: dict):
             meta.get("minutes_per_frame"),
             fps=meta.get("fps"),
         )
+        for stale in folder.glob("chunk_*_overlay.mp4"):
+            stale.unlink(missing_ok=True)
+        for stale in folder.glob("chunk_*_map.png"):
+            stale.unlink(missing_ok=True)
     except Exception as exc:
         traceback.print_exc()
         _write_meta(job_id, status="error", message=str(exc) or "The analysis could not finish.")
@@ -418,6 +422,73 @@ def clusters_overlay(job_id: str):
             content={"error": "missing_video", "message": "The cluster overlay video is not ready yet."},
         )
     return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/jobs/{job_id}/chunks/{cluster_id}/video.mp4")
+def chunk_overlay(job_id: str, cluster_id: int):
+    """Overlay with only one chunk drawn, cached per cluster id."""
+    folder = _job_dir(job_id)
+    out = folder / f"chunk_{int(cluster_id)}_overlay.mp4"
+    if out.exists():
+        return FileResponse(out, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+    missing = _missing(job_id)
+    if missing:
+        return missing
+    clusters_path = folder / "clusters.csv"
+    summary_path = folder / "cluster_summary.csv"
+    motion_path = folder / "motion.csv"
+    video_path = folder / "tracked.mp4"
+    if not video_path.exists():
+        video_path = folder / "video.mp4"
+    for path, label in [
+        (clusters_path, "clusters"),
+        (summary_path, "cluster summary"),
+        (motion_path, "motion"),
+        (video_path, "tracked video"),
+    ]:
+        if not path.exists():
+            return JSONResponse(
+                status_code=404,
+                content={"error": "not_ready", "message": f"Missing {label} for this chunk video."},
+            )
+    try:
+        import pandas as pd
+        from backend.render_cluster_video import render
+
+        clusters = pd.read_csv(clusters_path)
+        summary = pd.read_csv(summary_path)
+        one = clusters[clusters["cluster_id"] == int(cluster_id)]
+        sum_one = summary[summary["cluster_id"] == int(cluster_id)]
+        if one.empty:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "missing_chunk", "message": f"Chunk {cluster_id} was not found."},
+            )
+        tmp_dir = folder / "_chunk_tmp"
+        tmp_dir.mkdir(exist_ok=True)
+        cl = tmp_dir / f"clusters_{int(cluster_id)}.csv"
+        sm = tmp_dir / f"summary_{int(cluster_id)}.csv"
+        one.to_csv(cl, index=False)
+        sum_one.to_csv(sm, index=False)
+        meta = _read_meta(job_id)
+        fps = float(meta.get("fps") or 15.0)
+        # Render in a temp folder so we do not overwrite the full-field clusters_map.png.
+        tmp_out = tmp_dir / f"chunk_{int(cluster_id)}_overlay.mp4"
+        render(video_path, motion_path, cl, sm, tmp_out, fps=fps)
+        tmp_out.replace(out)
+        (tmp_dir / "clusters_map.png").unlink(missing_ok=True)
+    except Exception as exc:
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": "render_failed", "message": str(exc) or "Could not render that chunk video."},
+        )
+    if not out.exists():
+        return JSONResponse(
+            status_code=500,
+            content={"error": "render_failed", "message": "Chunk video was not written."},
+        )
+    return FileResponse(out, media_type="video/mp4", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/jobs/{job_id}/clusters_map.png")

@@ -14,8 +14,8 @@ Tracking writes `output/tracks.csv` (`cell_id, frame, x, y`). `data/` and `outpu
 
 ## Website flow
 Upload MP4 (+ optional `pixel_size_um`, `minutes_per_frame`) → track → set Point of Audio
-→ analyze → overview page (text summary + cluster video + trails) → chunks page
-(per-chunk text) → export.
+→ analyze → analysis page (muted overview video of all chunks + ranked chunks to
+inspect one at a time with sound) → export.
 
 Analyze re-clusters each time. Overlay video uses the source video FPS.
 Calibration is optional; missing scale/time keeps speeds in px/frame.

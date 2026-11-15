@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Analysis — Cellsound</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="img/logo.png" type="image/png">
+</head>
+<body class="app theme-light size-1" data-step="3">
+<a class="skip" href="#main">Skip to main content</a>
+<header class="site-header">
+  <a class="brand" href="index.html"><img class="brand-logo" src="img/logo.png" alt="" width="32" height="32">Cellsound</a>
+  <div class="header-tools">
+    <div class="display-wrap">
+      <button type="button" class="hdr-btn" id="display-button" aria-expanded="false" aria-controls="display-panel">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M5 19 9.5 5h2L16 19h-2.2l-.9-2.6H8.1L7.2 19H5zm3.6-4.4h3.8L10.6 8.2 8.6 14.6zM18 19V8.5h-1.6L14 10v1.8l2.4-1.4H17V19H18z"></path></svg>Text size &amp; contrast<svg class="chevron" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div id="display-panel" class="display-panel" role="group" aria-label="Text size and contrast" hidden>
+        <div class="field">
+          <label for="text-size">Text size</label>
+          <select class="select" id="text-size">
+            <option value="1">Standard</option>
+            <option value="2">Larger</option>
+            <option value="3">Largest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="contrast">Contrast</label>
+          <select class="select" id="contrast">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="hc">High contrast</option>
+          </select>
+        </div>
+        <label class="check-label" for="pause-animations">
+          <input type="checkbox" id="pause-animations"> Pause animations
+        </label>
+        <button type="button" class="done-btn" id="display-done">Done</button>
+      </div>
+    </div>
+    <a class="help-link" href="#help">Help</a>
+  </div>
+</header>
+<nav class="steps" aria-label="Analysis steps">
+  <ol>
+    <li><a class="step-link" data-step-link="1" href="#"><span class="badge badge-1" aria-hidden="true">1</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>Upload</a></li>
+    <li><a class="step-link" data-step-link="2" href="#"><span class="badge badge-2" aria-hidden="true">2</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Point of Audio</a></li>
+    <li><a class="step-link" data-step-link="3" href="#"><span class="badge badge-3" aria-hidden="true">3</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"></path><rect x="3" y="15" width="4" height="6" rx="1"></rect><rect x="17" y="15" width="4" height="6" rx="1"></rect></svg>Analysis</a></li>
+    <li><a class="step-link" data-step-link="4" href="#"><span class="badge badge-4" aria-hidden="true">4</span><svg class="step-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>Export</a></li>
+  </ol>
+</nav>
+
+<main id="main" tabindex="-1">
+<div class="hero hero-lilac">
+  <div class="mesh" aria-hidden="true"><i></i><i></i></div>
+  <div class="hero-inner">
+    <div class="hero-bar">
+      <p class="step-kicker">Step 3 of 4</p>
+      <button type="button" class="pause-btn" data-pause-mirror aria-pressed="false">
+        <svg data-icon="pause" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>
+        <svg data-icon="play" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M7 4v16l13-8z"></path></svg>
+        <span data-pause-label>Pause animations</span>
+      </button>
+    </div>
+    <h1>Video analysis</h1>
+    <p class="lede" id="hero-lede">Loading the video overview and the chunks that matter most.</p>
+  </div>
+</div>
+
+<div class="page stack">
+  <section class="card" aria-labelledby="overview-h">
+    <h2 id="overview-h">Video overview</h2>
+    <p class="hint">All chunks on the tracked frames. The overview video is silent — open one chunk below to listen.</p>
+    <div class="split" style="align-items:flex-start">
+      <div style="flex:1 1 16em;min-width:12em;max-width:28rem">
+        <video id="overview-video" playsinline muted controls preload="auto" aria-label="Overview video showing all chunks, muted" style="width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)"></video>
+      </div>
+      <div class="copy" style="flex:2 1 18em;min-width:14em">
+        <p id="desc-text">The overview will appear when the summary loads.</p>
+        <div style="overflow-x:auto;margin-top:1em">
+          <table class="stats">
+            <caption>Population summary</caption>
+            <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">What it means</th></tr></thead>
+            <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
+    <div>
+      <h2 id="trust-h">Tracking reliability</h2>
+      <p id="trust-note">Loading the tracking note.</p>
+    </div>
+  </div>
+
+  <section class="card" aria-labelledby="important-h">
+    <h2 id="important-h">Chunks to look at</h2>
+    <p class="hint" id="important-hint">Ranked by how strongly each matches the main population trend. Start with the top ones.</p>
+    <ol class="cluster-picks" id="chunk-picks"></ol>
+  </section>
+
+  <section class="card cluster-detail" id="chunk-detail" hidden aria-labelledby="detail-h">
+    <div style="display:flex;align-items:center;gap:0.8em;flex-wrap:wrap">
+      <span class="dot dot-big" id="detail-dot" aria-hidden="true">1</span>
+      <div class="copy" style="flex:1 1 12em">
+        <h2 id="detail-h" tabindex="-1">Chunk</h2>
+        <p class="hint" id="detail-meta"></p>
+      </div>
+    </div>
+    <div class="split" style="align-items:flex-start;margin-top:1em">
+      <div style="flex:1 1 16em;min-width:12em;max-width:28rem">
+        <video id="chunk-video" playsinline muted preload="auto" aria-label="Video with only the selected chunk highlighted" style="width:100%;height:auto;display:block;border-radius:12px;background:#000;border:3px solid var(--line)"></video>
+        <p class="hint" style="margin-top:0.5em">Only this chunk is drawn. Sound follows this video’s timeline.</p>
+      </div>
+      <div style="flex:2 1 16em;min-width:14em">
+        <div class="flow">
+          <button type="button" class="btn btn-primary" id="play"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path id="play-icon" d="M7 4v16l13-8z"></path></svg><span id="play-label">Play this chunk</span></button>
+          <button type="button" class="btn btn-line" id="replay">Replay from start</button>
+          <button type="button" class="btn btn-stop" id="stop">Stop all sound (Esc)</button>
+        </div>
+        <div class="cues" id="wave" aria-hidden="true">
+          <div class="cue"><span>Tone</span><span class="cue-track"><i id="pitch-fill"></i></span></div>
+          <div class="cue"><span>Pulses</span><span class="beat-dots" id="beat-dots"><i></i><i></i><i></i><i></i><i></i></span></div>
+        </div>
+        <p class="hint" id="tone-note">This chunk keeps its own tone. Faster pulses mean faster motion. Left/right follows place relative to the Point of Audio.</p>
+        <div class="field">
+          <label for="pos">Position in video</label>
+          <input id="pos" type="range" min="0" max="200" value="0" aria-valuetext="Start of the clip">
+          <p class="hint" id="pos-visible" aria-hidden="true">Start of the clip</p>
+        </div>
+        <div class="split">
+          <div class="field" style="flex:1 1 10em">
+            <label for="rate">Playback speed</label>
+            <select class="select" id="rate">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1 1 12em">
+            <label for="vol">App volume</label>
+            <input id="vol" type="range" min="0" max="100" value="70" aria-valuetext="Volume 70 percent">
+            <p class="hint" id="vol-hint">Volume 70 percent. Separate from your screen reader.</p>
+          </div>
+        </div>
+        <p class="listen-status" id="status-text" role="status" aria-live="polite" aria-atomic="true">Select a chunk above, then press Play.</p>
+      </div>
+    </div>
+    <div class="copy" style="margin-top:1em">
+      <h3>Description</h3>
+      <p id="detail-desc"></p>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="cmp">
+        <caption id="cmp-caption">Chunk compared with the whole video</caption>
+        <thead><tr><th scope="col">Measure</th><th scope="col">This chunk</th><th scope="col">All cells</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Average speed</th><td id="cmp-speed"></td><td id="all-speed"></td></tr>
+          <tr><th scope="row">Along main trend</th><td id="cmp-along"></td><td id="all-along"></td></tr>
+          <tr><th scope="row">Toward (−) or away (+)</th><td id="cmp-radial"></td><td id="all-radial"></td></tr>
+          <tr><th scope="row">Path</th><td id="cmp-path" colspan="2"></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="accordion" id="help" aria-labelledby="how-h">
+    <h2 id="how-h">
+      <button type="button" class="accordion-btn" id="how-btn" aria-expanded="false" aria-controls="how-panel">
+        <span>How to listen<small>One chunk at a time · Tone = identity · Pulses = speed · Side = left/right of POA</small></span>
+        <span id="how-state">Show</span>
+      </button>
+    </h2>
+    <div class="accordion-panel" id="how-panel" hidden>
+      <div class="bento">
+        <article class="card" style="background:var(--sky)">
+          <h3>Tone</h3>
+          <p>Each chunk keeps a fixed note so you can tell groups apart.</p>
+        </article>
+        <article class="card" style="background:var(--mint)">
+          <h3>Pulses</h3>
+          <p>Faster motion taps faster. Slow chunks tap slowly.</p>
+        </article>
+        <article class="card" style="background:var(--butter)">
+          <h3>Left and right</h3>
+          <p>Place relative to the Point of Audio. Bottom-center stays balanced; sides lean into that ear.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <div><a class="btn btn-primary" id="export-link" href="export.html">Continue to export</a></div>
+</div>
+</main>
+<script src="js/audio.js"></script>
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script src="js/analysis.js"></script>
+</body>
+</html>

@@ -212,7 +212,7 @@ document.getElementById("run").addEventListener("click", function () {
         }, 500);
       });
     }
-    window.location.href = hrefWithJob("overview.html");
+    window.location.href = hrefWithJob("analysis.html");
     return null;
   }).catch(function (error) {
     document.getElementById("run").disabled = false;
